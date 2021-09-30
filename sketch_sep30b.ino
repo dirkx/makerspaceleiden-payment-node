@@ -222,6 +222,7 @@ void loop()
 
   if (md != laststate) {
     lastchange = millis();
+    laststate = md;
     update = true;
   }
   // generic error out if something takes longer than 5 seconds.
