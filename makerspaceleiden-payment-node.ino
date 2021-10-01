@@ -18,6 +18,13 @@
 #include <Button2.h>
 #include <Arduino_JSON.h>
 
+// Todo - figure out correct licenses on these & include
+//
+#include "NotoSansBold15.h"
+#include "NotoSansBold36.h"
+
+#define AA_FONT_SMALL NotoSansBold15
+#define AA_FONT_LARGE NotoSansBold36
 
 #include "/Users/dirkx/.passwd.h"
 
@@ -176,55 +183,55 @@ void updateDisplay()
 {
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
-
-  tft.setTextSize(2);
-  tft.setTextColor(TFT_WHITE);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
   switch (md) {
     case BOOT:
       showLogo();
-      tft.setTextColor(TFT_YELLOW);
-      tft.setTextSize(2);
-      tft.drawString("Payment", tft.width() / 2, tft.height() / 2 - 30);
-      tft.drawString("Node", tft.width() / 2, tft.height() / 2 - 10);
+      tft.loadFont(AA_FONT_LARGE);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString("Pay", tft.width() / 2, tft.height() / 2 - 42);
+      tft.drawString("Node", tft.width() / 2, tft.height() / 2 - 0);
 
-      tft.setTextColor(TFT_WHITE);
-      tft.setTextSize(1);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.loadFont(AA_FONT_SMALL);
       tft.drawString(VERSION, tft.width() / 2, tft.height() / 2 + 30);
-      tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 40);
-      tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 50);
+      tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 48);
+      tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 66);
       break;
-      
+
     case ENTER_AMOUNT:
       memset(tag, 0, sizeof(tag));
+      showLogo();
+
+      tft.loadFont(AA_FONT_SMALL);
       tft.drawString("[-]", tft.width() / 2 - 42, tft.height()  - 12);
       tft.drawString("[+]", tft.width() / 2 + 42, tft.height()  - 12);
 
-      tft.setTextColor(TFT_GREEN);
-      tft.setTextSize(3);
-      tft.drawString("Swipe", tft.width() / 2, tft.height() / 2 - 52);
-      tft.drawString("to pay", tft.width() / 2, tft.height() / 2 - 26);
+      tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      tft.loadFont(AA_FONT_LARGE);
+      tft.drawString("Swipe", tft.width() / 2, tft.height() / 2 - 40);
+      tft.drawString("to pay", tft.width() / 2, tft.height() / 2 - 10);
 
-      tft.setTextColor(TFT_YELLOW);
-      tft.setTextSize(4);
-      tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 16);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 40);
       break;
     case OK_OR_CANCEL:
+      tft.loadFont(AA_FONT_SMALL);
       tft.drawString("cancel", tft.width() / 2 - 30, tft.height()  - 12);
       tft.drawString("OK", tft.width() / 2 + 48, tft.height()  - 12);
 
-      tft.setTextColor(TFT_GREEN);
-      tft.setTextSize(4);
+      tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      tft.loadFont(AA_FONT_LARGE);
       tft.drawString("PAY", tft.width() / 2, tft.height() / 2 - 52);
 
-      tft.setTextColor(TFT_WHITE);
-      tft.setTextSize(4);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 - 10);
       tft.drawString("?", tft.width() / 2, tft.height() / 2 + 30);
       break;
     case DID_CANCEL:
-      tft.setTextColor(TFT_RED);
-      tft.setTextSize(3);
+      tft.setTextColor(TFT_RED, TFT_BLACK);
+      tft.loadFont(AA_FONT_LARGE);
       tft.drawString("aborted", tft.width() / 2, tft.height() / 2 - 52);
       showLogo();
       delay(1000);
@@ -233,29 +240,29 @@ void updateDisplay()
       break;
     case DID_OK:
       showLogo();
-      tft.setTextColor(TFT_WHITE);
-      tft.setTextSize(2);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
       md = (payByREST(tag, amounts[amount].c_str()) == 200) ? PAID : OEPSIE;
       memset(tag, 0, sizeof(tag));
       break;
     case PAID:
       showLogo();
-      tft.setTextColor(TFT_WHITE);
-      tft.setTextSize(2);
-      tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
-      tft.setTextSize(3);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.loadFont(AA_FONT_LARGE);
       tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
+      tft.loadFont(AA_FONT_SMALL);
+      tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
       delay(1500);
       md = ENTER_AMOUNT;
       label = "";
       break;
     case OEPSIE:
       showLogo();
-      tft.setTextColor(TFT_WHITE);
-      tft.setTextSize(2);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.loadFont(AA_FONT_LARGE);
       tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
-      tft.setTextSize(1);
+      tft.loadFont(AA_FONT_SMALL);
       tft.drawString(label, tft.width() / 2, tft.height() / 2 + 2);
       tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
       delay(2500);
@@ -313,7 +320,7 @@ void setup()
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() / 2 +  22);
+    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() -20);
     delay(5000);
     ESP.restart();
   }
