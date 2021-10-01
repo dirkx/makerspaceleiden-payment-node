@@ -5,6 +5,8 @@
 // TFT_eSPI lib, Button2 lib
 //
 //
+#define VERSION "1.00-test"
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
@@ -49,10 +51,11 @@ int update = false;
 #define NA (9)
 String amounts[NA] = { "0.10", "0.25", "0.50", "1.00", "1.25", "1.50", "2.00", "2.50", "5.00" };
 int amount = 0;
-#define AMOUNT_NO_OK_NEEDED (1.01)
+// values above this amount will get an extra 'OK' question.
+#define AMOUNT_NO_OK_NEEDED (1.51)
 
-typedef enum { OEPSIE = 0, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID } state_t;
-state_t md = ENTER_AMOUNT;
+typedef enum { BOOT = 0, OEPSIE, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID } state_t;
+state_t md = BOOT;
 
 
 #define RFID_CS       12 // SDA on board, SS in library
@@ -66,6 +69,7 @@ SPIClass SDSPI(HSPI);
 MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &SDSPI);
 MFRC522 mfrc522 = MFRC522(&spiDevice);
 
+// Very ugly global vars - used to communicate between the REST call and the rest.
 char tag[sizeof(mfrc522.uid.uidByte) * 4] = { 0 };
 String label = "unset";
 
@@ -128,11 +132,10 @@ int payByREST(char *tag, const char * amount) {
   int httpCode = https.GET();
   if (httpCode == 200) {
     String payload = https.getString();
-    Serial.println(payload);
-    //{"result": true, "amount": "0.10", "user": "XXX" }
-    JSONVar res = JSON.parse(payload);
-
     bool ok = false;
+
+    Serial.println(payload);
+    JSONVar res = JSON.parse(payload);
 
     if (res.hasOwnProperty("result"))
       ok = (bool) res["result"];
@@ -141,10 +144,11 @@ int payByREST(char *tag, const char * amount) {
       label = res["user"];
 
     if (!ok) {
-      Serial.println("200 Ok, but false result.");
+      Serial.println("200 Ok, but false/incpmplete result.");
       label = "Rejected";
       httpCode = 600;
     }
+
   } else {
     label = https.errorToString(httpCode);
     if (label.length() < 2)
@@ -156,6 +160,7 @@ int payByREST(char *tag, const char * amount) {
     Serial.println(label);
   }
   https.end();
+
 
   return httpCode;
 }
@@ -176,6 +181,20 @@ void updateDisplay()
   tft.setTextColor(TFT_WHITE);
 
   switch (md) {
+    case BOOT:
+      showLogo();
+      tft.setTextColor(TFT_YELLOW);
+      tft.setTextSize(2);
+      tft.drawString("Payment", tft.width() / 2, tft.height() / 2 - 30);
+      tft.drawString("Node", tft.width() / 2, tft.height() / 2 - 10);
+
+      tft.setTextColor(TFT_WHITE);
+      tft.setTextSize(1);
+      tft.drawString(VERSION, tft.width() / 2, tft.height() / 2 + 30);
+      tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 40);
+      tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 50);
+      break;
+      
     case ENTER_AMOUNT:
       memset(tag, 0, sizeof(tag));
       tft.drawString("[-]", tft.width() / 2 - 42, tft.height()  - 12);
@@ -301,6 +320,9 @@ void setup()
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   configTime(0, 0, "nl.pool.ntp.org");
+
+  while (millis() < 1500) {};
+  md = ENTER_AMOUNT;
 }
 
 void loop()
@@ -326,5 +348,6 @@ void loop()
   }
 
   button_loop();
-  loopRFID();
+  if (md == ENTER_AMOUNT)
+    loopRFID();
 }
