@@ -5,14 +5,24 @@
 // TFT_eSPI lib, Button2 lib
 //
 //
-#include <TFT_eSPI.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+
 #include <SPI.h>
-#include "Button2.h"
+
+#include <TFT_eSPI.h>
 #include <MFRC522.h>
+#include <Button2.h>
+#include <Arduino_JSON.h>
+
+
+#include "/Users/dirkx/.passwd.h"
 
 // Just for the logo
 //
 #include "bmp.h"
+#include "ca_root.h"
 
 // TFT Pins has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
 //
@@ -39,6 +49,7 @@ int update = false;
 #define NA (9)
 String amounts[NA] = { "0.10", "0.25", "0.50", "1.00", "1.25", "1.50", "2.00", "2.50", "5.00" };
 int amount = 0;
+#define AMOUNT_NO_OK_NEEDED (1.01)
 
 typedef enum { OEPSIE = 0, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID } state_t;
 state_t md = ENTER_AMOUNT;
@@ -54,6 +65,9 @@ SPIClass SDSPI(HSPI);
 
 MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &SDSPI);
 MFRC522 mfrc522 = MFRC522(&spiDevice);
+
+char tag[sizeof(mfrc522.uid.uidByte) * 4] = { 0 };
+String label = "unset";
 
 void setupRFID()
 {
@@ -77,18 +91,73 @@ void loopRFID() {
     return;
   };
 
-  char tag[sizeof(mfrc522.uid.uidByte) * 4] = { 0 };
   for (int i = 0; i < mfrc522.uid.size; i++) {
     char buff[5]; // 3 digits, dash and \0.
     snprintf(buff, sizeof(buff), "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
     strncat(tag, buff, sizeof(tag));
   };
-  Serial.println("Good scan: ");
-  Serial.println(tag);
-  md = OK_OR_CANCEL;
+  Serial.println("Good scan");
+  md = atof(amounts[amount].c_str()) < AMOUNT_NO_OK_NEEDED ?  DID_OK : OK_OR_CANCEL;
   update = true;
 
   mfrc522.PICC_HaltA();
+}
+
+int payByREST(char *tag, const char * amount) {
+  char buff[1024];
+
+  WiFiClientSecure *client = new WiFiClientSecure;
+  client->setCACert(ca_root);
+
+  HTTPClient https;
+
+  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
+           "testterm", tag, amount, "Payment+terminal+at+the+space");
+
+  if (!https.begin(*client, buff)) {
+    Serial.println("setup fail");
+    return 999;
+  };
+
+#ifdef PAYMENT_TERMINAL_BEARER
+  https.addHeader("X-Bearer", PAYMENT_TERMINAL_BEARER);
+#endif
+
+  https.setTimeout(5000);
+
+  int httpCode = https.GET();
+  if (httpCode == 200) {
+    String payload = https.getString();
+    Serial.println(payload);
+    //{"result": true, "amount": "0.10", "user": "XXX" }
+    JSONVar res = JSON.parse(payload);
+
+    bool ok = false;
+
+    if (res.hasOwnProperty("result"))
+      ok = (bool) res["result"];
+
+    if (res.hasOwnProperty("user"))
+      label = res["user"];
+
+    if (!ok) {
+      Serial.println("200 Ok, but false result.");
+      label = "Rejected";
+      httpCode = 600;
+    }
+  } else {
+    label = https.errorToString(httpCode);
+    if (label.length() < 2)
+      label = https.getString();
+
+    Serial.print("REST call failed: ");
+    Serial.print(httpCode);
+    Serial.print(" - ");
+    Serial.println(label);
+  }
+  https.end();
+
+  return httpCode;
 }
 
 void showLogo() {
@@ -108,6 +177,7 @@ void updateDisplay()
 
   switch (md) {
     case ENTER_AMOUNT:
+      memset(tag, 0, sizeof(tag));
       tft.drawString("[-]", tft.width() / 2 - 42, tft.height()  - 12);
       tft.drawString("[+]", tft.width() / 2 + 42, tft.height()  - 12);
 
@@ -140,34 +210,40 @@ void updateDisplay()
       showLogo();
       delay(1000);
       md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
       showLogo();
       tft.setTextColor(TFT_WHITE);
       tft.setTextSize(2);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
-      delay(1000);
-      md = PAID;
+      md = (payByREST(tag, amounts[amount].c_str()) == 200) ? PAID : OEPSIE;
+      memset(tag, 0, sizeof(tag));
       break;
     case PAID:
       showLogo();
       tft.setTextColor(TFT_WHITE);
       tft.setTextSize(2);
-      tft.drawString("Dirk-Willem", tft.width() / 2, tft.height() / 2 - 22);
+      tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
       tft.setTextSize(3);
       tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
-      delay(1000);
+      delay(1500);
       md = ENTER_AMOUNT;
+      label = "";
       break;
     case OEPSIE:
       showLogo();
       tft.setTextColor(TFT_WHITE);
       tft.setTextSize(2);
       tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
-      tft.setTextSize(3);
-      tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  22);
-      delay(1000);
+      tft.setTextSize(1);
+      tft.drawString(label, tft.width() / 2, tft.height() / 2 + 2);
+      tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
+      delay(2500);
+      memset(tag, 0, sizeof(tag));
       md = ENTER_AMOUNT;
+      label = "";
+      break;
   }
   tft.setTextDatum(TL_DATUM);
 }
@@ -197,7 +273,7 @@ void button_loop()
   btn2.loop();
 }
 
-void setupTFT() {  
+void setupTFT() {
   tft.init();
   tft.setRotation(0);
   tft.setSwapBytes(true);
@@ -213,6 +289,18 @@ void setup()
   settupButtons();
 
   updateDisplay();
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
+
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() / 2 +  22);
+    delay(5000);
+    ESP.restart();
+  }
+  // try to get some reliable time; to stop my cert
+  // checking code complaining.
+  configTime(0, 0, "nl.pool.ntp.org");
 }
 
 void loop()
