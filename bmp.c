@@ -1,12 +1,11 @@
 // via https://lvgl.io/tools/imageconverter
 
-#define LV_COLOR_DEPTH 16
-#define LV_COLOR_16_SWAP 0
+
 
 #define msl_logo_map_width 32
  #define msl_logo_map_height 32
 
-const uint8_t msl_logo_map[] = {
+const unsigned char msl_logo_map[] = {
 
 #if LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8
   /*Pixel format: Blue: 2 bit, Green: 3 bit, Red: 3 bit*/
