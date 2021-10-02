@@ -18,7 +18,7 @@
 ///   TFT_eSPI
 //    Button2
 //    MFRC522-spi-i2c-uart-async
-//    Arduino_JSON 
+//    Arduino_JSON
 //
 // Manual config:
 //    Once TFT_eSPI is installed - it needs to be configured to select the right board.
@@ -42,6 +42,14 @@
 #ifndef PAYMENT_TERMINAL_BEARER
 // Must match line 245 in  makerspaceleiden/settings.py of https://github.com/MakerSpaceLeiden/makerspaceleiden-crm
 #define PAYMENT_TERMINAL_BEARER "not-so-very-secret-127.0.0.1"
+#endif
+
+#ifndef PAYMENT_URL
+#define PAYMENT_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
+#endif
+
+#ifndef TERMINAL_NAME
+#define TERMINAL_NAME "testerm"
 #endif
 
 #include <WiFi.h>
@@ -120,7 +128,7 @@ void setupRFID()
   SDSPI.begin(RFID_SCLK, RFID_MISO, RFID_MOSI, RFID_CS);
 
   mfrc522.PCD_Init();    // Init MFRC522
-  Serial.print("RFID Scanner:");
+  Serial.print("RFID Scanner: ");
   mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
 }
 
@@ -129,7 +137,7 @@ void loopRFID() {
     return;
   }
   if ( ! mfrc522.PICC_ReadCardSerial()) {
-    Serial.println("Bad read (was card removed too quickly?)");
+    Serial.println("Bad read (was card removed too quickly ? )");
     return;
   }
   if (mfrc522.uid.size == 0) {
@@ -137,10 +145,15 @@ void loopRFID() {
     return;
   };
 
+  // We're somewhat strict on the parsing/what we accept; as we use it unadultared in the URL.
+  if (mfrc522.uid.size > sizeof(mfrc522.uid.uidByte)) {
+    Serial.println("Too large a card id size. Ignoring.)");
+    return;
+  }
   for (int i = 0; i < mfrc522.uid.size; i++) {
     char buff[5]; // 3 digits, dash and \0.
-    snprintf(buff, sizeof(buff) - 1, "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
-    strncat(tag, buff, sizeof(tag));
+    snprintf(buff, sizeof(buff), "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
+    strncat(tag, buff, sizeof(tag) - 1);
   };
   Serial.println("Good scan");
   md = atof(amounts[amount].c_str()) < AMOUNT_NO_OK_NEEDED ?  DID_OK : OK_OR_CANCEL;
@@ -149,17 +162,45 @@ void loopRFID() {
   mfrc522.PICC_HaltA();
 }
 
+
+static unsigned char hex_digit(unsigned char c) {
+  return "01234567890ABCDEF"[c & 0x0F];
+};
+
+char *_argencode(char *dst, size_t n, char *src)
+{
+  char c, *d = dst;
+  while (c = *src++)
+  {
+    if (c == ' ') {
+      *dst++ = ' + ';
+    } else if (strchr("!*'();:@&=+$,/?%#[]", c) || c < 32 || c > 127 ) {
+      *d++ = ' % ';
+      *d++ = hex_digit(c >> 4);
+      *d++ = hex_digit(c);
+    } else {
+      *d++ = c;
+    };
+    if (d + 1 >= dst + n) {
+      Serial.println("Warning - buffer was too small. Truncating.");
+      break;
+    }
+  };
+  *d++ = '\0';
+  return dst;
+}
+
 int payByREST(char *tag, const char * amount) {
-  char buff[1024];
+  char buff[1024], tmp[1024];
 
   WiFiClientSecure *client = new WiFiClientSecure;
   client->setCACert(ca_root);
 
   HTTPClient https;
 
-  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
-           "testterm", tag, amount, "Payment+terminal+at+the+space");
-
+  snprintf(buff, sizeof(buff), PAYMENT_URL "?node =%s&src=%s&amount=%s&description=%s",
+           TERMINAL_NAME, tag, amount, _argencode(tmp, sizeof(tmp), "Payment terminal at the space"));
+           
   if (!https.begin(*client, buff)) {
     Serial.println("setup fail");
     return 999;
@@ -173,7 +214,7 @@ int payByREST(char *tag, const char * amount) {
 
   int httpCode = https.GET();
   if (httpCode == 200) {
-    String payload = https.getString();
+  String payload = https.getString();
     bool ok = false;
 
     Serial.println(payload);
@@ -186,7 +227,7 @@ int payByREST(char *tag, const char * amount) {
       label = res["user"];
 
     if (!ok) {
-      Serial.println("200 Ok, but false/incpmplete result.");
+      Serial.println("200 Ok, but false / incpmplete result.");
       label = "Rejected";
       httpCode = 600;
     }
@@ -196,9 +237,9 @@ int payByREST(char *tag, const char * amount) {
     if (label.length() < 2)
       label = https.getString();
 
-    Serial.print("REST call failed: ");
+    Serial.print("REST call failed : ");
     Serial.print(httpCode);
-    Serial.print(" - ");
+    Serial.print("-");
     Serial.println(label);
   }
   https.end();
@@ -219,6 +260,7 @@ void updateDisplay()
   tft.fillScreen(TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  showLogo();
 
   switch (md) {
     case BOOT:
@@ -236,17 +278,11 @@ void updateDisplay()
       break;
 
     case ENTER_AMOUNT:
-      memset(tag, 0, sizeof(tag));
-      showLogo();
 
       tft.loadFont(AA_FONT_SMALL);
-#if 0
-      tft.drawString("[-]", tft.width() / 2 - 42, tft.height()  - 12);
-      tft.drawString("[+]", tft.width() / 2 + 42, tft.height()  - 12);
-#else
       tft.pushImage(0,                        tft.height() - min_height, min_width, min_height, (uint16_t *)  min_map);
       tft.pushImage( tft.width() - min_width, tft.height() - min_height, min_width, min_height, (uint16_t *)  plus_map);
-#endif
+
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("Swipe", tft.width() / 2, tft.height() / 2 - 50);
@@ -254,6 +290,7 @@ void updateDisplay()
 
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
       tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 32);
+      memset(tag, 0, sizeof(tag));
       break;
     case OK_OR_CANCEL:
       tft.loadFont(AA_FONT_SMALL);
@@ -272,13 +309,11 @@ void updateDisplay()
       tft.setTextColor(TFT_RED, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("aborted", tft.width() / 2, tft.height() / 2 - 52);
-      showLogo();
       delay(1000);
       md = ENTER_AMOUNT;
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
-      showLogo();
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
@@ -286,7 +321,6 @@ void updateDisplay()
       memset(tag, 0, sizeof(tag));
       break;
     case PAID:
-      showLogo();
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
@@ -294,10 +328,10 @@ void updateDisplay()
       tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
       delay(1500);
       md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
       label = "";
       break;
     case OEPSIE:
-      showLogo();
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
@@ -305,8 +339,8 @@ void updateDisplay()
       tft.drawString(label, tft.width() / 2, tft.height() / 2 + 2);
       tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
       delay(2500);
-      memset(tag, 0, sizeof(tag));
       md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
       label = "";
       break;
   }
@@ -381,6 +415,7 @@ void loop()
     laststate = md;
     update = true;
   }
+
   // generic error out if something takes longer than 5 seconds.
   //
   if (millis() - lastchange > 5000 && md != ENTER_AMOUNT) {
