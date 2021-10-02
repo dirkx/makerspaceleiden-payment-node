@@ -15,6 +15,9 @@
    See example below. Include the tab in the main sketch, e.g.:
 
         #include "NotoSansBold36.h"
+
+These fonts are derived products from  https://fonts.google.com/noto/specimen/Noto+Sans and
+likely fall under the https://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=OFL license.
 */
 
 #include <pgmspace.h>
