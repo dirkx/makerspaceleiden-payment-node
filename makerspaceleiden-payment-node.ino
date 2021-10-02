@@ -1,11 +1,48 @@
 // dirkx@webweaving.org, apache license, for the makerspaceleiden.nl
 //
 // https://sites.google.com/site/jmaathuis/arduino/lilygo-ttgo-t-display-esp32
-// Board ESP32 Dev module
-// TFT_eSPI lib, Button2 lib
 //
+// Tools settings:
+//  Board ESP32 Dev module
+//  Upload Speed: 921600
+//  CPU Frequency: 240Mhz (WiFi/BT)
+//  Flash Frequency: 80Mhz
+//  Flash Mode: QIO
+//  Flash Size: 4MB (32Mb)
+//  Partition Scheme: Default 4MB with spiffs (1.2MB APP/1.5 SPIFFS)
+//  Core Debug Level: None
+//  PSRAM: Disabled
+//  Port: [the COM port your board has connected to]
+//
+// Additional Librariries (via Sketch -> library manager):
+///   TFT_eSPI
+//    Button2
+//    MFRC522-spi-i2c-uart-async
+//    Arduino_JSON 
+//
+// Manual config:
+//    Once TFT_eSPI is installed - it needs to be configured to select the right board.
+//    Go to .../Arduino/library/TFT_eSPI and open the file "User_Setup_Select.h".
+//    Uncomment the line with that says:
+//       // #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
+//    and chagne it to:
+//       #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
+//    i.e. remove the first two // characters. Then save it again in the same place.
 //
 #define VERSION "1.00-test"
+
+#ifndef WIFI_NETWORK
+#define WIFI_NETWORK "MyWifiNetwork"
+#endif
+
+#ifndef WIFI_PASSWD
+#define WIFI_PASSWD "MyWifiPassword"
+#endif
+
+#ifndef PAYMENT_TERMINAL_BEARER
+// Must match line 245 in  makerspaceleiden/settings.py of https://github.com/MakerSpaceLeiden/makerspaceleiden-crm
+#define PAYMENT_TERMINAL_BEARER "not-so-very-secret-127.0.0.1"
+#endif
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -18,26 +55,22 @@
 #include <Button2.h>
 #include <Arduino_JSON.h>
 
-// Todo - figure out correct licenses on these & include
-//
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
 
 #define AA_FONT_SMALL NotoSansBold15
 #define AA_FONT_LARGE NotoSansBold36
 
-#include "/Users/dirkx/.passwd.h"
+#define LV_COLOR_DEPTH 16
+#define LV_COLOR_16_SWAP 0
+#include "bmp.c"
+#include "plus.c"
+#include "min.c"
 
-// Just for the logo
-//
-#include "bmp.h"
 #include "ca_root.h"
 
 // TFT Pins has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
 //
-// Configuire the line
-//     <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
-// in "User_Setup_Select.h" (in the TFT_eSPI lib) for this.
 //
 // #define TFT_MOSI            19
 // #define TFT_SCLK            18
@@ -45,6 +78,8 @@
 // #define TFT_DC              16
 // #define TFT_RST             23
 // #define TFT_BL              4   // Display backlight control pin
+
+#define TOUCH_CS
 
 #define BUTTON_1            35
 #define BUTTON_2            0
@@ -77,7 +112,7 @@ MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &SDSPI);
 MFRC522 mfrc522 = MFRC522(&spiDevice);
 
 // Very ugly global vars - used to communicate between the REST call and the rest.
-char tag[sizeof(mfrc522.uid.uidByte) * 4] = { 0 };
+char tag[sizeof(mfrc522.uid.uidByte) * 4 + 1 ] = { 0 };
 String label = "unset";
 
 void setupRFID()
@@ -104,7 +139,7 @@ void loopRFID() {
 
   for (int i = 0; i < mfrc522.uid.size; i++) {
     char buff[5]; // 3 digits, dash and \0.
-    snprintf(buff, sizeof(buff), "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
+    snprintf(buff, sizeof(buff) - 1, "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
     strncat(tag, buff, sizeof(tag));
   };
   Serial.println("Good scan");
@@ -205,16 +240,20 @@ void updateDisplay()
       showLogo();
 
       tft.loadFont(AA_FONT_SMALL);
+#if 0
       tft.drawString("[-]", tft.width() / 2 - 42, tft.height()  - 12);
       tft.drawString("[+]", tft.width() / 2 + 42, tft.height()  - 12);
-
+#else
+      tft.pushImage(0,                        tft.height() - min_height, min_width, min_height, (uint16_t *)  min_map);
+      tft.pushImage( tft.width() - min_width, tft.height() - min_height, min_width, min_height, (uint16_t *)  plus_map);
+#endif
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
-      tft.drawString("Swipe", tft.width() / 2, tft.height() / 2 - 40);
-      tft.drawString("to pay", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("Swipe", tft.width() / 2, tft.height() / 2 - 50);
+      tft.drawString("to pay", tft.width() / 2, tft.height() / 2 - 18);
 
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 40);
+      tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 32);
       break;
     case OK_OR_CANCEL:
       tft.loadFont(AA_FONT_SMALL);
@@ -320,7 +359,7 @@ void setup()
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() -20);
+    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() - 20);
     delay(5000);
     ESP.restart();
   }
