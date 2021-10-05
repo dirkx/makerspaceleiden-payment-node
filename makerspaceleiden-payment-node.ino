@@ -173,9 +173,9 @@ char *_argencode(char *dst, size_t n, char *src)
   while (c = *src++)
   {
     if (c == ' ') {
-      *dst++ = ' + ';
+      *d++ = '+';
     } else if (strchr("!*'();:@&=+$,/?%#[]", c) || c < 32 || c > 127 ) {
-      *d++ = ' % ';
+      *d++ = '%';
       *d++ = hex_digit(c >> 4);
       *d++ = hex_digit(c);
     } else {
@@ -198,9 +198,11 @@ int payByREST(char *tag, const char * amount) {
 
   HTTPClient https;
 
-  snprintf(buff, sizeof(buff), PAYMENT_URL "?node =%s&src=%s&amount=%s&description=%s",
+  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
            TERMINAL_NAME, tag, amount, _argencode(tmp, sizeof(tmp), "Payment terminal at the space"));
-           
+
+  Serial.println(buff);
+
   if (!https.begin(*client, buff)) {
     Serial.println("setup fail");
     return 999;
@@ -214,7 +216,7 @@ int payByREST(char *tag, const char * amount) {
 
   int httpCode = https.GET();
   if (httpCode == 200) {
-  String payload = https.getString();
+    String payload = https.getString();
     bool ok = false;
 
     Serial.println(payload);
@@ -243,7 +245,6 @@ int payByREST(char *tag, const char * amount) {
     Serial.println(label);
   }
   https.end();
-
 
   return httpCode;
 }
