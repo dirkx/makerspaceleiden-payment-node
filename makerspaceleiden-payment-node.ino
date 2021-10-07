@@ -29,6 +29,8 @@
 //       #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
 //    i.e. remove the first two // characters. Then save it again in the same place.
 //
+#include "/Users/dirkx/.passwd.h"
+
 #define VERSION "1.00-test"
 
 #ifndef WIFI_NETWORK
@@ -48,9 +50,15 @@
 #define PAYMENT_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
 #endif
 
-#ifndef TERMINAL_NAME
-#define TERMINAL_NAME "testerm"
+#ifndef SDU_URL
+#define SDU_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
 #endif
+
+#ifndef TERMINAL_NAME
+#define TERMINAL_NAME "display-terminal"
+#endif
+
+#define HTTP_TIMEOUT (5000)
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -98,9 +106,12 @@ Button2 btn2(BUTTON_2);
 
 int update = false;
 
-#define NA (9)
-String amounts[NA] = { "0.10", "0.25", "0.50", "1.00", "1.25", "1.50", "2.00", "2.50", "5.00" };
+int NA = 0;
+char **amounts = NULL;
+char **prices = NULL;
+char **descs = NULL;
 int amount = 0;
+
 // values above this amount will get an extra 'OK' question.
 #define AMOUNT_NO_OK_NEEDED (1.51)
 
@@ -156,7 +167,7 @@ void loopRFID() {
     strncat(tag, buff, sizeof(tag) - 1);
   };
   Serial.println("Good scan");
-  md = atof(amounts[amount].c_str()) < AMOUNT_NO_OK_NEEDED ?  DID_OK : OK_OR_CANCEL;
+  md = atof(amounts[amount]) < AMOUNT_NO_OK_NEEDED ?  DID_OK : OK_OR_CANCEL;
   update = true;
 
   mfrc522.PICC_HaltA();
@@ -164,17 +175,17 @@ void loopRFID() {
 
 
 static unsigned char hex_digit(unsigned char c) {
-  return "01234567890ABCDEF"[c & 0x0F];
+  return "0123456789ABCDEF"[c & 0x0F];
 };
 
 char *_argencode(char *dst, size_t n, char *src)
 {
   char c, *d = dst;
-  while (c = *src++)
+  while ((c = *src++) != 0)
   {
     if (c == ' ') {
       *d++ = '+';
-    } else if (strchr("!*'();:@&=+$,/?%#[]", c) || c < 32 || c > 127 ) {
+    } else if (strchr("!*'();:@&=+$,/?%#[] ", c) || c < 32 || c > 127 ) {
       *d++ = '%';
       *d++ = hex_digit(c >> 4);
       *d++ = hex_digit(c);
@@ -190,20 +201,16 @@ char *_argencode(char *dst, size_t n, char *src)
   return dst;
 }
 
-int payByREST(char *tag, const char * amount) {
-  char buff[1024], tmp[1024];
-
+JSONVar rest(const char *url, int * statusCode) {
   WiFiClientSecure *client = new WiFiClientSecure;
-  client->setCACert(ca_root);
-
+  String label = "unset";
   HTTPClient https;
+  static JSONVar res;
 
-  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
-           TERMINAL_NAME, tag, amount, _argencode(tmp, sizeof(tmp), "Payment terminal at the space"));
+  client->setCACert(ca_root);
+  https.setTimeout(HTTP_TIMEOUT);
 
-  Serial.println(buff);
-
-  if (!https.begin(*client, buff)) {
+  if (!https.begin(*client, url)) {
     Serial.println("setup fail");
     return 999;
   };
@@ -211,40 +218,97 @@ int payByREST(char *tag, const char * amount) {
 #ifdef PAYMENT_TERMINAL_BEARER
   https.addHeader("X-Bearer", PAYMENT_TERMINAL_BEARER);
 #endif
-
-  https.setTimeout(5000);
-
   int httpCode = https.GET();
+
+  Serial.print("Result: ");
+  Serial.println(httpCode);
+
   if (httpCode == 200) {
     String payload = https.getString();
     bool ok = false;
 
+    Serial.print("Payload: ");
     Serial.println(payload);
-    JSONVar res = JSON.parse(payload);
+    res = JSON.parse(payload);
+  };
+
+  if (httpCode != 200) {
+    label = https.errorToString(httpCode);
+
+    if (label.length() < 2)
+      label = https.getString();
+
+    Serial.print("REST payment call failed: ");
+    Serial.print(httpCode);
+    Serial.print("-");
+    Serial.println(label);
+  };
+  https.end();
+  *statusCode = httpCode;
+
+  return res;
+}
+
+int setupPrices() {
+  char buff[512];
+  int httpCode = 0;
+
+  snprintf(buff, sizeof(buff), SKUS_URL);
+  JSONVar res = rest(buff, &httpCode);
+  Serial.println(httpCode);
+
+  if (httpCode != 200)
+    return httpCode;
+
+  size_t len = res.length();
+  amounts = (char **) malloc(sizeof(char *) * len);
+  prices = (char **) malloc(sizeof(char *) * len);
+  descs = (char **) malloc(sizeof(char *) * len);
+
+  for (int i = 0; i <  len; i++) {
+    JSONVar item = res[i];
+
+    amounts[i] = strdup(item["name"]);
+    prices[i] = strdup(item["price"]);
+    descs[i] = strdup(item["description"]);
+
+    Serial.printf("%4x %12s %s\n", i, amounts[i], prices[i]);
+  };
+  NA = len;
+  return httpCode;
+}
+int payByREST(char *tag, char * amount, char *lbl) {
+  char buff[512];
+  char desc[128];
+  char tmp[128];
+
+  snprintf(desc, sizeof(desc), "%s. Payment at terminal %s", lbl, TERMINAL_NAME);
+
+  // avoid logging the tag for privacy/security-by-obscurity reasons.
+  //
+  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
+           TERMINAL_NAME, "XX-XX-XX-XXX", amount, _argencode(tmp, sizeof(tmp), desc));
+  Serial.print("URL: ");
+  Serial.println(buff);
+
+  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
+           TERMINAL_NAME, tag, amount, _argencode(tmp, sizeof(tmp), desc));
+
+  int httpCode = 0;
+  JSONVar res = rest(buff, &httpCode);
+
+  if (httpCode == 200) {
+    bool ok = false;
+    label = String((const char*) res["user"]);
 
     if (res.hasOwnProperty("result"))
       ok = (bool) res["result"];
 
-    if (res.hasOwnProperty("user"))
-      label = res["user"];
-
     if (!ok) {
       Serial.println("200 Ok, but false / incpmplete result.");
-      label = "Rejected";
       httpCode = 600;
     }
-
-  } else {
-    label = https.errorToString(httpCode);
-    if (label.length() < 2)
-      label = https.getString();
-
-    Serial.print("REST call failed : ");
-    Serial.print(httpCode);
-    Serial.print("-");
-    Serial.println(label);
-  }
-  https.end();
+  };
 
   return httpCode;
 }
@@ -291,6 +355,11 @@ void updateDisplay()
 
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
       tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 + 32);
+
+      tft.loadFont(AA_FONT_SMALL);
+      tft.drawString(descs[amount], tft.width() / 2, tft.height() / 2 + 58);
+      tft.drawString(prices[amount], tft.width() / 2, tft.height() / 2 + 72);
+
       memset(tag, 0, sizeof(tag));
       break;
     case OK_OR_CANCEL:
@@ -304,6 +373,8 @@ void updateDisplay()
 
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.drawString(amounts[amount], tft.width() / 2, tft.height() / 2 - 10);
+      tft.loadFont(AA_FONT_SMALL);
+      tft.drawString(prices[amount], tft.width() / 2, tft.height() / 2 - 20);
       tft.drawString("?", tft.width() / 2, tft.height() / 2 + 30);
       break;
     case DID_CANCEL:
@@ -318,7 +389,7 @@ void updateDisplay()
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
-      md = (payByREST(tag, amounts[amount].c_str()) == 200) ? PAID : OEPSIE;
+      md = (payByREST(tag, prices[amount], descs[amount]) == 200) ? PAID : OEPSIE;
       memset(tag, 0, sizeof(tag));
       break;
     case PAID:
@@ -387,7 +458,6 @@ void setup()
   setupTFT();
   setupRFID();
   settupButtons();
-
   updateDisplay();
 
   WiFi.mode(WIFI_STA);
@@ -401,6 +471,7 @@ void setup()
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   configTime(0, 0, "nl.pool.ntp.org");
+  setupPrices();
 
   while (millis() < 1500) {};
   md = ENTER_AMOUNT;
@@ -419,8 +490,14 @@ void loop()
 
   // generic error out if something takes longer than 5 seconds.
   //
-  if (millis() - lastchange > 5000 && md != ENTER_AMOUNT) {
+  if ((millis() - lastchange > 5000 && md != ENTER_AMOUNT)) {
     md = OEPSIE;
+    update = true;
+  };
+
+  if (millis() - lastchange > 60 * 1000 && amount != 0) {
+    lastchange = millis();
+    amount = 0;
     update = true;
   };
 
