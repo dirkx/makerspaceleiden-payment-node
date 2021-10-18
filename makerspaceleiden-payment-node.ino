@@ -88,17 +88,38 @@
 // TFT Pins has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
 //
 //
-// #define TFT_MOSI            19
-// #define TFT_SCLK            18
-// #define TFT_CS              5
-// #define TFT_DC              16
-// #define TFT_RST             23
-// #define TFT_BL              4   // Display backlight control pin
+// 1.77 160(RGB)x128 Board  labeling v.s pining
+// 1  GND
+// 2  VCC   3V3
+// 3  SCK   CLK
+// 4  SDA   MOSI
+// 5  RES   RESET
+// 6  RS    A0 / bank select / DC
+// 7  CS    SS
+// 8 LEDA - wire to digital out or 3V3
+// 9 LEDA - wire to digital out or 3V3
+//
+
+// #define TFT_MOSI            12 // shared with screen
+// #define TFT_MISO            13 // not wired up - but needed as shared with screen.:wq
+// #define TFT_SCLK            14 // shared with screen
+// #define TFT_CS              26
+// #define TFT_DC              27
+// #define TFT_RST              2 // shared with screen
 
 #define TOUCH_CS
 
-#define BUTTON_1            35
-#define BUTTON_2            0
+#define LED_1            34
+#define LED_2            335
+#define BUTTON_1            32
+#define BUTTON_2            33
+
+#define RFID_SCLK           14 // shared with screen
+#define RFID_MOSI           12 // shared with screen
+#define RFID_MISO           13 // shared with screen
+#define RFID_CS             25 
+#define RFID_RESET          -1  // shared with screen
+#define RFID_IRQ             3  
 
 TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 Button2 btn1(BUTTON_1);
@@ -118,16 +139,9 @@ int amount = 0;
 typedef enum { BOOT = 0, OEPSIE, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID } state_t;
 state_t md = BOOT;
 
+// SPIClass spi = SDSPI(VSPI);
 
-#define RFID_CS       12 // SDA on board, SS in library
-#define RFID_SCLK     13
-#define RFID_MOSI     15
-#define RFID_MISO     02
-#define RFID_RESET    21
-
-SPIClass SDSPI(HSPI);
-
-MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &SDSPI);
+MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &spi);
 MFRC522 mfrc522 = MFRC522(&spiDevice);
 
 // Very ugly global vars - used to communicate between the REST call and the rest.
@@ -135,8 +149,8 @@ char tag[sizeof(mfrc522.uid.uidByte) * 4 + 1 ] = { 0 };
 String label = "unset";
 
 void setupRFID()
-{
-  SDSPI.begin(RFID_SCLK, RFID_MISO, RFID_MOSI, RFID_CS);
+{  
+  // spi.begin(RFID_SCLK, RFID_MISO, RFID_MOSI, RFID_CS);
 
   mfrc522.PCD_Init();    // Init MFRC522
   Serial.print("RFID Scanner: ");
@@ -421,6 +435,11 @@ void updateDisplay()
 
 void settupButtons()
 {
+  pinMode(LED_1,OUTPUT);
+  pinMode(LED_2,OUTPUT);
+  digitalWrite(LED_1,0);
+  digitalWrite(LED_2,0);
+  
   btn1.setPressedHandler([](Button2 & b) {
     update = true;
     if (md == ENTER_AMOUNT)
@@ -464,7 +483,7 @@ void setup()
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    tft.drawString("Wifi fail - repbooting", tft.width() / 2, tft.height() - 20);
+    tft.drawString("Wifi fail - rebooting", tft.width() / 2, tft.height() - 20);
     delay(5000);
     ESP.restart();
   }
