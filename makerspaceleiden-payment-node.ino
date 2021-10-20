@@ -34,7 +34,7 @@
 //       #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
 //    i.e. remove the first two // characters. Then save it again in the same place.
 //
-#define VERSION "1.01-test"
+#define VERSION "1.02-test"
 
 #ifndef WIFI_NETWORK
 #define WIFI_NETWORK "MyWifiNetwork"
@@ -336,6 +336,14 @@ JSONVar rest(const char *url, bool connectOk,  int * statusCode) {
 
   Serial.print("Result: ");
   Serial.println(httpCode);
+
+  if (httpCode < 0) {
+    Serial.println("Rebooting, wifi issue" );
+    display.showString("NET FAIL");
+    delay(1000);
+    ESP.restart();
+  }
+
   const mbedtls_x509_crt*  peer = client->getPeerCertificate();
 
   if (httpCode == 200
@@ -815,6 +823,7 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
+  WiFi.setHostname(terminalName);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
     tft.drawString("Wifi fail - rebooting", tft.width() / 2, tft.height() - 20);
