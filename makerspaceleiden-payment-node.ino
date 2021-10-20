@@ -838,6 +838,10 @@ void setup()
   ArduinoOTA.setHostname(terminalName);
 #ifdef OTA_HASH
   ArduinoOTA.setPasswordHash(OTA_HASH);
+#else
+#ifdef OTA_PASSWORD
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+#endif
 #endif
 
   ArduinoOTA
