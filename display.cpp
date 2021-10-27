@@ -1,3 +1,46 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <TFT_eSPI.h>
+#include <MFRC522.h>
+
+#include "display.h"
+
+#include "NotoSansMedium8.h"
+#define AA_FONT_TINY  NotoSansMedium8
+
+#include "NotoSansMedium12.h"
+#define AA_FONT_SMALL NotoSansMedium12
+
+#include "NotoSansBold15.h"
+#define AA_FONT_MEDIUM NotoSansBold15
+
+#include "NotoSansMedium20.h"
+#define AA_FONT_LARGE NotoSanMedium20
+
+#include "NotoSansBold36.h"
+#define AA_FONT_HUGE  NotoSansBold36
+
+#define LV_COLOR_DEPTH 16
+#define LV_COLOR_16_SWAP 0
+#include "bmp.c"
+
+TFT_eSPI tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
+TFT_eSprite spr = TFT_eSprite(&tft);
+
+extern int NA;
+extern char **amounts;
+extern char **prices;
+extern char **descs;
+extern int amount;
+extern int default_item ;
+typedef enum { BOOT = 0, REGISTER, REGISTER_SWIPE, REGISTER_FAIL, OEPSIE, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, FIRMWARE_UPDATE, FIRMWARE_FAIL } state_t;
+extern state_t md;
+#define VERSION "1.02-test"
+extern int setupPrices(char *tag);
+extern char tag[48]; 
+extern int payByREST(char *tag, char * amount, char *lbl);
+extern String label;
+
 void setupTFT() {
   tft.init();
   tft.setRotation(3);
