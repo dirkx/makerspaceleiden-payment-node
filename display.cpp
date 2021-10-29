@@ -259,6 +259,7 @@ void displayForceShowError(char * str) {
 }
 
 void setTFTPower(bool onoff) {
+  Serial.println(onoff ? "Powering display on" : "Powering display off");
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
   delay(100);
 }

@@ -348,29 +348,29 @@ void loop()
   ArduinoOTA.handle();
   updateTimeAndRebootAtMidnight(false);
 
-  {
-    static unsigned long t = 0;
-    static bool x = true;
-    if (millis() - t > 2000) {
-      Serial.println(x ? "Diplay on" : "Display off");
-      setTFTPower(x);
-      x = ! x;
-      t = millis();
-    }
-  }
-
-  if (md == REGISTER || md == REGISTER_PRICELIST) {
-    if (registerDeviceAndFetchPrices())
+  if (md == FETCH_CA) {
+    if (fetchCA())
+      md = REGISTER;
+  };
+  if (md == REGISTER) {
+    if (registerDevice())
       md = ENTER_AMOUNT;
     return;
   };
   if (md == WAIT_FOR_REGISTER_SWIPE) {
     if (loopRFID())
-      registerDeviceAndFetchPrices();
+      registerDevice();
     return;
+  };
+  if (md == REGISTER_PRICELIST) {
+    if (fetchPricelist())
+      md = ENTER_AMOUNT;
   };
 
   if (md != laststate) {
+    if (laststate == SCREENSAVER)
+      setTFTPower(true);
+
     laststate = md;
     lastchange = millis();
     update = true;
@@ -394,6 +394,12 @@ void loop()
     last_amount = amount;
     lastchange = millis();
   };
+
+  if (millis() - lastchange > SCREENSAVER_TIMEOUT && md ==  ENTER_AMOUNT) {
+    md = SCREENSAVER;
+    setTFTPower(false);
+  };
+
   if (md == ENTER_AMOUNT && default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
     last_amount = amount = default_item;
     Serial.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);

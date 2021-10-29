@@ -26,23 +26,16 @@
 #include "geneckey.h"
 #include "selfsign.h"
 
-
-#define _MAX_PUBKEY_LEN (3*1024)// easily fits a 4096 bit RSA 
-
-unsigned char * _der_server;
-size_t _der_server_len = 0, _der_client_len = 0;
 mbedtls_x509_crt * client_cert_ptr = NULL, client_cert;
 
-unsigned char _nonce[128];
-
+char * ca_root = NULL;
+char * nonce = NULL;
 char * server_cert_as_pem = NULL;
 char * client_cert_as_pem = NULL;
 char * client_key_as_pem = NULL;
 
 unsigned char sha256_client[32], sha256_server[32], sha256_server_key[32];
 
-char * ca_root = NULL;
-char * nonce = NULL;
 
 #define URL "https://makerspaceleiden.nl:4443/crm/pettycash"
 #define REGISTER_PATH "/api/v2/register"
@@ -145,17 +138,67 @@ void wipekeys() {
   nvs_flash_init(); // initialize the NVS partition.
 }
 
-bool registerDeviceAndFetchPrices() {
+bool fetchCA() {
   WiFiClientSecure *client;
   const mbedtls_x509_crt *peer ;
   HTTPClient https;
-  int httpCode, len;
   unsigned char tmp[128], buff[2 * 1024], sha256[256 / 8];
-  const char * name, * desc;
+  int httpCode;
   bool ok = false;
   JSONVar res;
 
-  // Wait for the time to work - to prevent SSL funnyness.
+  // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
+  //
+  time_t now = time(nullptr);
+  if (now < 3600) {
+    return false;
+  };
+  updateDisplay_progressText("fetching CA");
+
+  if (!(client = new WiFiClientSecure())) {
+    Serial.println("WiFiClientSecure creation failed.");
+    goto exit;
+  }
+
+  // Sadly required - due to a limitation in the current SSL stack we must
+  // provide the root CA. but we do not know it (yet). So learn it first.
+  //
+  client->setInsecure();
+  if (!https.begin(*client, URL ) || https.GET() < 0) {
+    Serial.println("Failed to begin https");
+    goto exit;
+  };
+  
+  peer = client->getPeerCertificate();
+  mbedtls_sha256_ret(peer->raw.p, peer->raw.len, sha256_server, 0);
+  server_cert_as_pem = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
+
+  // Traverse up to (any) root & serialize the CAcert. We need it in
+  // PEM format; as that is what setCACert() expects.
+  //
+  while (peer->next) peer = peer->next;
+  ca_root = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
+
+  updateDisplay_progressText("CA Cert fetched");
+  ok = true;
+exit:
+  https.end();
+  client->stop();
+  delete client;
+
+  return ok;
+}
+
+bool registerDevice() {
+  WiFiClientSecure *client;
+  const mbedtls_x509_crt *peer ;
+  HTTPClient https;
+  int httpCode;
+  unsigned char tmp[128], buff[2 * 1024], sha256[256 / 8];
+  bool ok = false;
+  JSONVar res;
+
+  // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
   //
   time_t now = time(nullptr);
   if (now < 3600) {
@@ -167,29 +210,6 @@ bool registerDeviceAndFetchPrices() {
     goto exit;
   }
 
-  if (ca_root == NULL) {
-    updateDisplay_progressText("fetching CA");
-    // Sadly required - due to a limitation in the current SSL stack we must
-    // provide the root CA. but we do not know it (yet). So learn it first.
-    //
-    client->setInsecure();
-    if (!https.begin(*client, URL ) || https.GET() < 0) {
-      Serial.println("Failed to begin https");
-      goto exit;
-    };
-    const mbedtls_x509_crt* peer = client->getPeerCertificate();
-    mbedtls_sha256_ret(peer->raw.p, peer->raw.len, sha256_server, 0);
-    server_cert_as_pem = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
-
-    // Traverse up to (any) root & serialize the CAcert. We need it in
-    // PEM format; as that is what setCACert() expects.
-    //
-    while (peer->next) peer = peer->next;
-    ca_root = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
-
-    updateDisplay_progressText("CA Cert fetched");
-    goto exit;
-  };
 
   client->setCACert(ca_root);
   client->setCertificate(client_cert_as_pem);
@@ -319,100 +339,22 @@ bool registerDeviceAndFetchPrices() {
 
 
       keystore.end();
-
     }
 
     Serial.println("\nWe are fully paired - we've proven to each other we know the secret & there is no MITM.");
+    ok = true;
     md = REGISTER_PRICELIST;
     goto exit;
   };
 
-  if (md != REGISTER_PRICELIST) {
-    Serial.println("odd - not in the price list phase yet..");
-  };
-
-  updateDisplay_progressText("fetching prices");
-
-  // Fetch the pricelist.
-  if (!https.begin(*client, URL REGISTER_PATH )) {
-    Serial.println("Failed to begin https");
-    goto exit;
-  };
-
-  httpCode =  https.GET();
-
-  peer = client->getPeerCertificate();
-  if (fingerprint_from_certpubkey(peer, sha256)) {
-    Serial.println("Extraction of public key of server failed. Aborted.");
-    goto exit;
-  };
-  if (0 != memcmp(sha256, sha256_server_key, 31)) {
-    Serial.println("Server pub key changed. Aborting");
-    goto exit;
-  }
-  if (httpCode != 200) {
-    Serial.printf("SKUS fetch failed: %d\n", httpCode);
-    goto exit;
-  };
-
-  // Serial.print("SKU response:"); Serial.println(https.getString());
-
-  if (httpCode == 401) {
-    // odd - it thinks we're not registered.
-    Serial.println("We're not seen as registerd. Wipe keys and retry ??");
-    goto exit;
-  };
-
-  if (httpCode != 200) {
-    md = REGISTER_FAIL;
-    Serial.printf("SKU fetch fail: %d\n", httpCode);
-    goto exit;
-  };
-
-  res =  JSON.parse(https.getString());
-
-  name = res["name"]; // need to strdup them if we weant to use them elsewhere.
-  desc = res["name"];
-  if (!name || !strlen(name)) {
-    Serial.println("Bogus SKU or not yet assiged a station");
-    goto exit;
-  }
-
-  len = res["pricelist"].length();
-  if (len < 0 || len > 256) {
-    Serial.println("Bogus SKU price list");
-    goto exit;
-  }
-
-  amounts = (char **) malloc(sizeof(char *) * len);
-  prices = (char **) malloc(sizeof(char *) * len);
-  descs = (char **) malloc(sizeof(char *) * len);
-
-  default_item = -1;
-  for (int i = 0; i <  len; i++) {
-    JSONVar item = res["pricelist"][i];
-
-    amounts[i] = strdup(item["name"]);
-    prices[i] = strdup(item["price"]);
-    descs[i] = strdup(item["description"]);
-
-    if (item["default"])
-      amount = default_item = i;
-
-    Serial.printf("%12s %c %s\n", amounts[i], i == default_item ? '*' : ' ', prices[i]);
-  };
-  Serial.printf("%d items total\n", len);
-  NA = len;
-  ok = true;
-  updateDisplay_progressText("got prices");
-
+  Serial.println("odd - not in the price list phase yet..");
 exit:
   https.end();
   client->stop();
   delete client;
 
   return ok;
-}
+};
 
 
 JSONVar rest(const char *url, int * statusCode) {
@@ -507,4 +449,52 @@ int payByREST(char *tag, char * amount, char *lbl) {
     }
   };
   return httpCode;
+}
+
+
+bool fetchPricelist() {
+  int httpCode = 0, len = -1;
+
+  updateDisplay_progressText("fetching prices");
+
+  JSONVar res = rest(URL REGISTER_PATH, &httpCode);
+  if (httpCode != 200) {
+    Serial.println("SKU price list fetch failed.");
+    return false;
+  }
+
+  const char * nme = res["name"]; // need to strdup them if we weant to use them elsewhere.
+  const char * desc = res["description"];
+  if (!nme || !strlen(nme)) {
+    Serial.println("Bogus SKU or not yet assiged a station");
+    return false;
+  }
+
+  len = res["pricelist"].length();
+  if (len < 0 || len > 256) {
+    Serial.println("Bogus SKU price list");
+    return false;
+  }
+
+  amounts = (char **) malloc(sizeof(char *) * len);
+  prices = (char **) malloc(sizeof(char *) * len);
+  descs = (char **) malloc(sizeof(char *) * len);
+
+  default_item = -1;
+  for (int i = 0; i <  len; i++) {
+    JSONVar item = res["pricelist"][i];
+
+    amounts[i] = strdup(item["name"]);
+    prices[i] = strdup(item["price"]);
+    descs[i] = strdup(item["description"]);
+
+    if (item["default"])
+      amount = default_item = i;
+
+    Serial.printf("%12s %c %s\n", amounts[i], i == default_item ? '*' : ' ', prices[i]);
+  };
+  Serial.printf("%d items total\n", len);
+  NA = len;
+  updateDisplay_progressText("got prices");
+  return true;
 }
