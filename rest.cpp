@@ -36,6 +36,13 @@ char * client_key_as_pem = NULL;
 
 unsigned char sha256_client[32], sha256_server[32], sha256_server_key[32];
 
+const char * KS_NAME = "keystore";
+const char * KS_KEY_VERSION = "version";
+const char * KS_KEY_CLIENT_CRT = "ccap";
+const char * KS_KEY_CLIENT_KEY = "ckap";
+const char * KS_KEY_SERVER_KEY = "ssk";
+
+const unsigned short KS_VERSION = 0x100;
 
 #define URL "https://makerspaceleiden.nl:4443/crm/pettycash"
 #define REGISTER_PATH "/api/v2/register"
@@ -72,14 +79,12 @@ bool getks(Preferences keystore, const char * key, char ** dst) {
   if (len == 0)
     return false;
   if (*dst == 0)
-    *dst = (char *)malloc(len + 1);
+    *dst = (char *)malloc(len + 1); // assume/know they are strings that need an extra terminating 0
   keystore.getBytes(key, *dst, len);
   (*dst)[len] = 0;
   return true;
 }
 
-const char * KS_NAME = "keystore";
-const unsigned short KS_VERSION = 0x100;
 
 state_t setupAuth(const char * terminalName) {
   mbedtls_x509write_cert crt;
@@ -91,21 +96,20 @@ state_t setupAuth(const char * terminalName) {
   if (!keystore.begin(KS_NAME, false))
     Serial.println("Keystore open failed");
 
-  unsigned short version = keystore.getUShort("version", 0);
+  unsigned short version = keystore.getUShort(KS_KEY_VERSION, 0);
   if (version != KS_VERSION ||
-      !getks(keystore, "ccap", &client_cert_as_pem) ||
-      !getks(keystore, "ckap", &client_key_as_pem) ||
-      !keystore.getBytes("ssk", sha256_server_key, 32))
+      !getks(keystore, KS_KEY_CLIENT_CRT, &client_cert_as_pem) ||
+      !getks(keystore, KS_KEY_CLIENT_KEY, &client_key_as_pem) ||
+      !keystore.getBytes(KS_KEY_SERVER_KEY, sha256_server_key, 32))
   {
     Serial.println("Incomplete/absent keystore");
     keystore.end();
     wipekeys();
 
-
     if (!keystore.begin(KS_NAME, false))
       Serial.println("Keystore open failed");
 
-    keystore.putUShort("version", KS_VERSION);
+    keystore.putUShort(KS_KEY_VERSION, KS_VERSION);
 
     geneckey(&key);
 
@@ -122,7 +126,6 @@ state_t setupAuth(const char * terminalName) {
     };
   } else {
     Serial.printf("Using existing keys (keystore version 0x%03x), fully configured\n", version);
-    ret = REGISTER_PRICELIST;
   }
   keystore.end();
   fingerprint_from_pem(client_cert_as_pem, sha256_client);
@@ -133,7 +136,7 @@ state_t setupAuth(const char * terminalName) {
 }
 
 void wipekeys() {
-  Serial.println("Wiping keys");
+  Serial.println("Wiping keystore");
   nvs_flash_erase(); // erase the NVS partition and...
   nvs_flash_init(); // initialize the NVS partition.
 }
@@ -168,7 +171,7 @@ bool fetchCA() {
     Serial.println("Failed to begin https");
     goto exit;
   };
-  
+
   peer = client->getPeerCertificate();
   mbedtls_sha256_ret(peer->raw.p, peer->raw.len, sha256_server, 0);
   server_cert_as_pem = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
@@ -180,6 +183,9 @@ bool fetchCA() {
   ca_root = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
 
   updateDisplay_progressText("CA Cert fetched");
+  if (client_key_as_pem)
+    md = REGISTER_PRICELIST;
+
   ok = true;
 exit:
   https.end();
@@ -316,26 +322,26 @@ bool registerDevice() {
       if (!keystore.begin(KS_NAME, false))
         Serial.println("Keystore open failed");
 
-      if (keystore.getUShort("version", 0) != KS_VERSION)
+      if (keystore.getUShort(KS_KEY_VERSION, 0) != KS_VERSION)
         Serial.println("**** NVS not working 2 *****");
 
-      keystore.putBytes("ccap", client_cert_as_pem, strlen(client_cert_as_pem));
-      keystore.putBytes("ckap", client_key_as_pem, strlen(client_key_as_pem));
-      keystore.putBytes("ssk", sha256_server_key, 32);
+      keystore.putBytes(KS_KEY_CLIENT_CRT, client_cert_as_pem, strlen(client_cert_as_pem));
+      keystore.putBytes(KS_KEY_CLIENT_KEY, client_key_as_pem, strlen(client_key_as_pem));
+      keystore.putBytes(KS_KEY_SERVER_KEY, sha256_server_key, 32);
       keystore.end();
     }
     {
       Preferences keystore;
 
       keystore.begin(KS_NAME, false);
-      if (keystore.getUShort("version", 0) != KS_VERSION)
+      if (keystore.getUShort(KS_KEY_VERSION, 0) != KS_VERSION)
         Serial.println("**** NVS not working 3 *****");
 
-      Serial.printf("version:            %x\n", keystore.getBytesLength("version"));
-      Serial.printf("version:            %x\n", keystore.getUShort("version", -1));
-      Serial.printf("client_cert_as_pem: %x\n", keystore.getBytesLength("ccap"));
-      Serial.printf("client_key_as_pem:  %x\n", keystore.getBytesLength("ckap"));
-      Serial.printf("sha256_server_key:  %x\n", keystore.getBytesLength("ssk"));
+      Serial.printf("version:            %x\n", keystore.getBytesLength(KS_KEY_VERSION));
+      Serial.printf("version:            %x\n", keystore.getUShort(KS_KEY_VERSION, -1));
+      Serial.printf("client_cert_as_pem: %x\n", keystore.getBytesLength(KS_KEY_CLIENT_CRT));
+      Serial.printf("client_key_as_pem:  %x\n", keystore.getBytesLength(KS_KEY_CLIENT_KEY));
+      Serial.printf("sha256_server_key:  %x\n", keystore.getBytesLength(KS_KEY_SERVER_KEY));
 
 
       keystore.end();
@@ -391,6 +397,7 @@ JSONVar rest(const char *url, int * statusCode) {
     httpCode = 999;
     goto exit;
   };
+  
   if (0 != memcmp(sha256, sha256_server_key, 31)) {
     Serial.println("Server pubkey changed. Aborting");
     httpCode = 666;

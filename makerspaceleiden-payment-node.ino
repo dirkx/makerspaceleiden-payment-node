@@ -204,6 +204,10 @@ void updateTimeAndRebootAtMidnight(bool force) {
 void settupButtons()
 {
   btn1.setPressedHandler([](Button2 & b) {
+    if (md == SCREENSAVER) {
+      update = true; md = ENTER_AMOUNT;
+      return;
+    };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
       if (amount + 1 < NA)
@@ -217,6 +221,10 @@ void settupButtons()
   });
 
   btn2.setPressedHandler([](Button2 & b) {
+    if (md == SCREENSAVER) {
+      update = true; md = ENTER_AMOUNT;
+      return;
+    };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
       if (amount > 0 )
@@ -338,6 +346,7 @@ void setup()
 
   while (millis() < 1500) {};
   updateDisplay_progressText("Waiting for NTP");
+  md = FETCH_CA;
 }
 
 void loop()
@@ -349,12 +358,11 @@ void loop()
   updateTimeAndRebootAtMidnight(false);
 
   if (md == FETCH_CA) {
-    if (fetchCA())
-      md = REGISTER;
+    fetchCA();
+    return;
   };
   if (md == REGISTER) {
-    if (registerDevice())
-      md = ENTER_AMOUNT;
+    registerDevice();
     return;
   };
   if (md == WAIT_FOR_REGISTER_SWIPE) {

@@ -121,11 +121,23 @@ void updateDisplay()
       tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 42);
       tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 60);
       break;
+    case FETCH_CA:
+      showLogo();
+      tft.loadFont(AA_FONT_LARGE);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString("fetching CA...", tft.width() / 2, tft.height() / 2 - 10);
+      break;
     case REGISTER:
       showLogo();
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("registering...", tft.width() / 2, tft.height() / 2 - 0);
+      tft.drawString("registering...", tft.width() / 2, tft.height() / 2 - 10);
+      break;
+    case REGISTER_PRICELIST:
+      showLogo();
+      tft.loadFont(AA_FONT_LARGE);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString("pricelist", tft.width() / 2, tft.height() / 2 - 10);
       break;
     case WAIT_FOR_REGISTER_SWIPE:
       showLogo();
@@ -231,6 +243,7 @@ void updateDisplay()
       tft.drawString("update aborted", tft.width() / 2,  40);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString(label, tft.width() / 2,  tft.height() / 2);
+      break;
   }
 }
 
