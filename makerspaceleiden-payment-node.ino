@@ -88,7 +88,7 @@ char terminalName[64];
 #define RFID_RESET          17  // shared with screen
 #define RFID_IRQ             3
 
-#ifdef BOARD_V2
+#ifdef BOARD_V2XXXX
 Button2 btn1(BUTTON_1, INPUT, false, true /* active low */);
 Button2 btn2(BUTTON_2, INPUT, false, true /* active low */);
 #else
@@ -204,29 +204,29 @@ void updateTimeAndRebootAtMidnight(bool force) {
 void settupButtons()
 {
   btn1.setPressedHandler([](Button2 & b) {
-    int l = md;
+    int l = amount;
     if (md == ENTER_AMOUNT && NA)
       if (amount + 1 < NA)
         amount = (amount + 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_OK;
 
-    update = update || (md != ENTER_AMOUNT) || (l != md);
-    if (l != md)
+    update = update || (md != ENTER_AMOUNT) || (l != amount);
+    if (l != amount)
       Serial.println("B1");
   });
 
   btn2.setPressedHandler([](Button2 & b) {
-    int l = md;
+    int l = amount;
     if (md == ENTER_AMOUNT && NA)
       if (amount > 0 )
         amount = (amount + NA - 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_CANCEL;
 
-    update = update || (md != ENTER_AMOUNT) || (l != md);
+    update = update || (md != ENTER_AMOUNT) || (l != amount);
 
-    if (l != md) {
+    if (l != amount) {
       Serial.println("B2");
     }
   });
@@ -347,6 +347,17 @@ void loop()
   static int last_amount = -1;
   ArduinoOTA.handle();
   updateTimeAndRebootAtMidnight(false);
+
+  {
+    static unsigned long t = 0;
+    static bool x = true;
+    if (millis() - t > 2000) {
+      Serial.println(x ? "Diplay on" : "Display off");
+      setTFTPower(x);
+      x = ! x;
+      t = millis();
+    }
+  }
 
   if (md == REGISTER || md == REGISTER_PRICELIST) {
     if (registerDeviceAndFetchPrices())

@@ -257,3 +257,8 @@ void displayForceShowError(char * str) {
   delay(1000);
   md = prev;
 }
+
+void setTFTPower(bool onoff) {
+  tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
+  delay(100);
+}

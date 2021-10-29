@@ -14,4 +14,5 @@ void updateDisplay();
 void updateDisplay_progressText(char * str);
 void displayForceShowError(char * str);
 void updateClock(char * str);
+void setTFTPower(bool onoff);
 #endif
