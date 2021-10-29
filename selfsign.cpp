@@ -69,7 +69,7 @@ const char * der2pem(const char *what, unsigned char * der, size_t derlen) {
   mbedtls_base64_encode (NULL, 0, &len, der, derlen);
   pem = (unsigned char *) malloc(len);
   p = tmp = (unsigned char *) malloc(len + len / 64 + 100);
-  ep = p + len + 1000;
+  ep = p + len + 100;
 
   p += snprintf((char *)p, ep - p, "-----BEGIN %s-----\n", what);
 

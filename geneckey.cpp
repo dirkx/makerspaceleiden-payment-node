@@ -4,13 +4,12 @@
 
 #include <Arduino.h>
 
-#define mbedtls_printf          Serial.printf
 
-#include "mbedtls/error.h"
-#include "mbedtls/pk.h"
-#include "mbedtls/ecdsa.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
+#include <mbedtls/error.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/ecdsa.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
 
 #include "geneckey.h"
 
@@ -45,7 +44,6 @@ int geneckey(mbedtls_pk_context *key)
   if ( ( ret = mbedtls_pk_setup(key,
                                 mbedtls_pk_info_from_type( MBEDTLS_PK_ECKEY ) ) ) != 0 ) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    //mbedtls_printf("mbedtls_pk_setup returned -x%04x: %s\n", (unsigned int) - ret, buff);
     Serial.print("mbedtls_pk_setup: ");
     Serial.println(buff);
     goto exit;
@@ -54,7 +52,6 @@ int geneckey(mbedtls_pk_context *key)
   if ((ret = mbedtls_ecp_gen_key(DFL_EC_CURVE, mbedtls_pk_ec(*key),
                                  mbedtls_ctr_drbg_random, &ctr_drbg )) != 0) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    // mbedtls_printf("mbedtls_ecp_gen_key returned -0x%04x: %s\n", (unsigned int) - ret, buff);
     Serial.print("mbedtls_ecp_gen_key: ");
     Serial.println(buff);
     goto exit;

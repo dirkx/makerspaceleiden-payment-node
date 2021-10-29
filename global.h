@@ -59,6 +59,10 @@
 // undef if you do not want the screensaver
 #define SCREENSAVER_TIMEOUT (15*60*1000 /* 15 mins */)
 
+#define AMOUNT_NO_OK_NEEDED (5.0)
+
+typedef enum { BOOT = 0, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
+
 // keep all ugly globals in one place for now.
 //
 extern int NA;
@@ -66,13 +70,13 @@ extern char **amounts;
 extern char **prices;
 extern char **descs;
 extern int amount;
+extern double amount_no_ok_needed;
 extern int default_item ;
-typedef enum { BOOT = 0, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
 extern state_t md;
 extern const char * version;
 extern char terminalName[64];
 extern char tag[128];
 extern String label;
-
+void led_loop();
 
 #endif

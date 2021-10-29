@@ -34,7 +34,6 @@ void setupTFT() {
   spr.createSprite(3 * tft.width(), 68);
 }
 
-
 void showLogo() {
   tft.pushImage(
     (tft.width() - msl_logo_map_width) / 2, 10, // (tft.height() - msl_logo_map_width) ,
@@ -273,6 +272,14 @@ void displayForceShowError(char * str) {
 
 void setTFTPower(bool onoff) {
   Serial.println(onoff ? "Powering display on" : "Powering display off");
+#ifdef ST7735_DISPON
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
+#else
+#ifdef ST7789_DISPON
+  tft.writecommand(onoff ? ST7789_DISPON : ST7789_DISPOFF);
+#else
+#error "No onoff"
+#endif
+#endif
   delay(100);
 }

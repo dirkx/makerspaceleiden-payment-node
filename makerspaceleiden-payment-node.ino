@@ -38,55 +38,23 @@
 char terminalName[64];
 
 #include <WiFi.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
-#include <ArduinoOTA.h>
 #include <SPI.h>
 #include <ESPmDNS.h>
 
 #include <MFRC522.h>
 #include <Button2.h>
-#include <Arduino_JSON.h>
 #include <analogWrite.h>
 
 #include "global.h"
 #include "selfsign.h"
 #include "display.h"
 #include "rest.h"
+#include "ota.h"
 
-// TFT Pins has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-//
-// 1.77 160(RGB)x128 Board  labeling v.s pining
-// 1  GND
-// 2  VCC   3V3
-// 3  SCK   CLK
-// 4  SDA   MOSI
-// 5  RES   RESET
-// 6  RS    A0 / bank select / DC
-// 7  CS    SS
-// 8 LEDA - wired to 3V3
-// 9 LEDA - already wired to pin 8 on the board.
-//
+// #include "pins_tft177.h" // 1.77" boards
+#include "pins_ttgo.h" // TTGO unit with own buttons; no LEDs.
 
-// #define TFT_MOSI            12 /
-// #define TFT_MISO            13 // not used
-// #define TFT_SCLK            14 /
-// #define TFT_CS              26
-// #define TFT_DC              27
-// #define TFT_RST              2
-
-#define LED_1               23 // CANCELand left red light
-#define LED_2               22 // OK and right red light
-#define BUTTON_1            32 // CANCEL and LEFT button
-#define BUTTON_2            33 // OK and right button
-
-#define RFID_SCLK           16 // shared with screen
-#define RFID_MOSI            5 // shared with screen
-#define RFID_MISO           13 // shared with screen
-#define RFID_CS             25  // ok
-#define RFID_RESET          17  // shared with screen
-#define RFID_IRQ             3
 
 #ifdef BOARD_V2XXXX
 Button2 btn1(BUTTON_1, INPUT, false, true /* active low */);
@@ -104,10 +72,10 @@ char **prices = NULL;
 char **descs = NULL;
 int amount = 0;
 int default_item = -1;
+double amount_no_ok_needed = AMOUNT_NO_OK_NEEDED;
 const char * version = VERSION;
 
 // values above this amount will get an extra 'OK' question.
-#define AMOUNT_NO_OK_NEEDED (5)
 
 state_t md = BOOT;
 
@@ -149,7 +117,8 @@ bool loopRFID() {
   if (mfrc522.uid.size > sizeof(mfrc522.uid.uidByte)) {
     Serial.println("Too large a card id size. Ignoring.)");
     return false;
-  }
+  };
+
   memset(tag, 0, sizeof(tag));
   for (int i = 0; i < mfrc522.uid.size; i++) {
     char buff[5]; // 3 digits, dash and \0.
@@ -248,13 +217,16 @@ void button_loop()
 
 void setupLEDS()
 {
+#ifdef LED_1
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
   digitalWrite(LED_1, 0);
   digitalWrite(LED_2, 0);
+#endif
 }
 
 void led_loop() {
+#ifdef LED_1
   switch (md) {
     case ENTER_AMOUNT:
       // Visibly dim the buttons at the end of the strip; as current 'wrap around'
@@ -267,10 +239,12 @@ void led_loop() {
       digitalWrite(LED_2, 0);
       break;
     default:
+      // Switch them off - nothing you can do here.
       digitalWrite(LED_1, 1);
       digitalWrite(LED_2, 1);
       break;
   };
+#endif
 }
 
 void setup()
@@ -284,7 +258,10 @@ void setup()
   Serial.print("Start " );
   Serial.println(terminalName);
 
+
+#ifdef LED_1
   setupLEDS();
+#endif
   setupTFT();
   md = BOOT;
   updateDisplay();
@@ -302,50 +279,17 @@ void setup()
     delay(5000);
     ESP.restart();
   }
+  Serial.printf("Joined WiFi:%s as ", WIFI_NETWORK);
+  Serial.println(WiFi.localIP());
+
+  setupOTA();
+
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   //
+  updateDisplay_progressText("Waiting for NTP");
   configTime(2 * 3600 /* hardcode CET/CEST */, 3600, "nl.pool.ntp.org");
 
-  ArduinoOTA.setHostname(terminalName);
-#ifdef OTA_HASH
-  ArduinoOTA.setPasswordHash(OTA_HASH);
-#else
-#ifdef OTA_PASSWORD
-  ArduinoOTA.setPassword(OTA_PASSWORD);
-#endif
-#endif
-
-  ArduinoOTA
-  .onStart([]() {
-    md = FIRMWARE_UPDATE;
-    led_loop();
-    updateDisplay();
-  })
-  .onEnd([]() {
-    // wipe the keys - to prevent some cleversod from uploading something to
-    // extract them keys. We ignore the serial angle - as that needs HW
-    // protection and an ESP32-S2.
-    wipekeys();
-  })
-  .onProgress([](unsigned int progress, unsigned int total) {
-    updateDisplay_progressBar(1.0 * progress / total);
-  })
-  .onError([](ota_error_t error) {
-    if (error == OTA_AUTH_ERROR) label = "Auth Failed";
-    else if (error == OTA_BEGIN_ERROR) label = "Begin Failed";
-    else if (error == OTA_CONNECT_ERROR) label = "Connect Failed";
-    else if (error == OTA_RECEIVE_ERROR) label = "Receive Failed";
-    else if (error == OTA_END_ERROR) label = "End Failed";
-    else label = "Uknown error";
-    displayForceShowError((char*)label.c_str());
-    delay(5000);
-    md = OEPSIE;
-  });
-  ArduinoOTA.begin();
-
-  while (millis() < 1500) {};
-  updateDisplay_progressText("Waiting for NTP");
   md = FETCH_CA;
 }
 
@@ -354,38 +298,70 @@ void loop()
   static unsigned long lastchange = 0;
   static state_t laststate = OEPSIE;
   static int last_amount = -1;
-  ArduinoOTA.handle();
   updateTimeAndRebootAtMidnight(false);
+  ota_loop();
+  button_loop();
+#ifdef LED_1
+  led_loop();
+#endif
 
-  if (md == FETCH_CA) {
-    fetchCA();
-    return;
-  };
-  if (md == REGISTER) {
-    registerDevice();
-    return;
-  };
-  if (md == WAIT_FOR_REGISTER_SWIPE) {
-    if (loopRFID())
+  switch (md) {
+    case FETCH_CA:
+      {
+        // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
+        //
+        time_t now = time(nullptr);
+        if (now < 3600) {
+          return;
+        };
+      };
+      fetchCA();
+      return;
+    case REGISTER:
       registerDevice();
-    return;
-  };
-  if (md == REGISTER_PRICELIST) {
-    if (fetchPricelist())
-      md = ENTER_AMOUNT;
+      return;
+    case WAIT_FOR_REGISTER_SWIPE:
+      if (loopRFID())
+        registerDevice();
+      return;
+    case REGISTER_PRICELIST:
+      if (fetchPricelist())
+        md = ENTER_AMOUNT;
+      return;
+    case ENTER_AMOUNT:
+      if (millis() - lastchange > SCREENSAVER_TIMEOUT) {
+        md = SCREENSAVER;
+        setTFTPower(false);
+        return;
+      };
+      if (default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
+        last_amount = amount = default_item;
+        Serial.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
+        update = true;
+      };
+      if (NA > 0) {
+        scrollpanel_loop();
+        if (loopRFID()) {
+          md = (atof(prices[amount]) < AMOUNT_NO_OK_NEEDED) ?  DID_OK : OK_OR_CANCEL;
+          update = true;
+        };
+      };
+    default:
+      break;
   };
 
-  if (md != laststate) {
+  if (md != laststate || last_amount != amount) {
     if (laststate == SCREENSAVER && md != SCREENSAVER) {
       setTFTPower(true);
     };
-
     laststate = md;
     lastchange = millis();
+    last_amount = amount;
     update = true;
   }
 
-  // generic error out if something takes longer than 1- seconds.
+  // generic time/error out if something takes longer than 1- seconds and we are in a state
+  // where one does not expect this.
   //
   if ((millis() - lastchange > 10 * 1000 && md != ENTER_AMOUNT && md != SCREENSAVER)) {
     if (md == OK_OR_CANCEL)
@@ -394,36 +370,6 @@ void loop()
       md = OEPSIE;
 
     update = true;
-  };
-
-  // go back to the defaut if we have one
-  //
-  if (last_amount != amount) {
-    Serial.printf("Detected change: %d != %d / %d, %d\n", last_amount , amount, digitalRead(BUTTON_1), digitalRead(BUTTON_2));
-    last_amount = amount;
-    lastchange = millis();
-  };
-
-  if (millis() - lastchange > SCREENSAVER_TIMEOUT && md ==  ENTER_AMOUNT) {
-    md = SCREENSAVER;
-    setTFTPower(false);
-  };
-
-  if (md == ENTER_AMOUNT && default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
-    last_amount = amount = default_item;
-    Serial.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
-    update = true;
-  };
-
-  button_loop();
-  led_loop();
-
-  if (md == ENTER_AMOUNT && NA > 0) {
-    scrollpanel_loop();
-    if (loopRFID()) {
-      md = (atof(prices[amount]) < AMOUNT_NO_OK_NEEDED) ?  DID_OK : OK_OR_CANCEL;
-      update = true;
-    };
   };
 
   if (update) {

@@ -44,6 +44,8 @@ const char * KS_KEY_SERVER_KEY = "ssk";
 
 const unsigned short KS_VERSION = 0x100;
 
+#define URL_NONE "https://makerspaceleiden.nl:4443/crm/pettycash/api/none"
+
 #define URL "https://makerspaceleiden.nl:4443/crm/pettycash"
 #define REGISTER_PATH "/api/v2/register"
 
@@ -92,6 +94,8 @@ state_t setupAuth(const char * terminalName) {
   Preferences keystore;
   state_t ret = REGISTER;
   char tmp[65];
+
+  return ret;
 
   if (!keystore.begin(KS_NAME, false))
     Serial.println("Keystore open failed");
@@ -142,33 +146,38 @@ void wipekeys() {
 }
 
 bool fetchCA() {
-  WiFiClientSecure *client;
+  WiFiClientSecure * client;
+  HTTPClient * https;
+
   const mbedtls_x509_crt *peer ;
-  HTTPClient https;
-  unsigned char tmp[128], buff[2 * 1024], sha256[256 / 8];
+  unsigned char sha256[256 / 8];
   int httpCode;
   bool ok = false;
   JSONVar res;
 
-  // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
-  //
-  time_t now = time(nullptr);
-  if (now < 3600) {
-    return false;
-  };
   updateDisplay_progressText("fetching CA");
 
   if (!(client = new WiFiClientSecure())) {
     Serial.println("WiFiClientSecure creation failed.");
     goto exit;
   }
+  if (!(https = new HTTPClient())) {
+    Serial.println("HTTPClient creation failed.");
+    goto exit;
+  }
+  Serial.print("Heap L "); Serial.println(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
   // Sadly required - due to a limitation in the current SSL stack we must
   // provide the root CA. but we do not know it (yet). So learn it first.
   //
   client->setInsecure();
-  if (!https.begin(*client, URL ) || https.GET() < 0) {
-    Serial.println("Failed to begin https");
+  if (!https->begin(*client, URL_NONE )) {
+    Serial.println("Failed to begin https - fetchCA");
+    goto exit;
+  };
+
+  if (https->GET() < 0) {
+    Serial.println("Failed to begin https (GET, fetchCA)");
     goto exit;
   };
 
@@ -188,10 +197,14 @@ bool fetchCA() {
 
   ok = true;
 exit:
-  https.end();
+  https->end();
   client->stop();
+
+  delete https;
   delete client;
 
+  if (!ok)
+    delay(5000);
   return ok;
 }
 
@@ -200,16 +213,9 @@ bool registerDevice() {
   const mbedtls_x509_crt *peer ;
   HTTPClient https;
   int httpCode;
-  unsigned char tmp[128], buff[2 * 1024], sha256[256 / 8];
+  unsigned char tmp[128], buff[1024], sha256[256 / 8];
   bool ok = false;
   JSONVar res;
-
-  // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
-  //
-  time_t now = time(nullptr);
-  if (now < 3600) {
-    return false;
-  };
 
   if (!(client = new WiFiClientSecure())) {
     Serial.println("WiFiClientSecure creation failed.");
@@ -397,7 +403,7 @@ JSONVar rest(const char *url, int * statusCode) {
     httpCode = 999;
     goto exit;
   };
-  
+
   if (0 != memcmp(sha256, sha256_server_key, 31)) {
     Serial.println("Server pubkey changed. Aborting");
     httpCode = 666;
@@ -483,6 +489,11 @@ bool fetchPricelist() {
     return false;
   }
 
+  double  cap = res["max_permission_amount"];
+  if (cap > 0) {
+    Serial.printf("Non default permission amount of %.2% euro\n", cap);
+    amount_no_ok_needed = cap;
+  };
   amounts = (char **) malloc(sizeof(char *) * len);
   prices = (char **) malloc(sizeof(char *) * len);
   descs = (char **) malloc(sizeof(char *) * len);
