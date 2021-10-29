@@ -376,7 +376,7 @@ void loop()
   };
 
   if (md != laststate) {
-    if (laststate == SCREENSAVER && md 1= SCREENSAVER)
+    if (laststate == SCREENSAVER && md != SCREENSAVER)
       setTFTPower(true);
 
     laststate = md;
