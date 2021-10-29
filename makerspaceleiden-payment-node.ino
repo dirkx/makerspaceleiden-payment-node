@@ -376,8 +376,9 @@ void loop()
   };
 
   if (md != laststate) {
-    if (laststate == SCREENSAVER && md != SCREENSAVER)
+    if (laststate == SCREENSAVER && md != SCREENSAVER) {
       setTFTPower(true);
+    };
 
     laststate = md;
     lastchange = millis();
@@ -386,7 +387,7 @@ void loop()
 
   // generic error out if something takes longer than 1- seconds.
   //
-  if ((millis() - lastchange > 10 * 1000 && md != ENTER_AMOUNT)) {
+  if ((millis() - lastchange > 10 * 1000 && md != ENTER_AMOUNT && md != SCREENSAVER)) {
     if (md == OK_OR_CANCEL)
       md = ENTER_AMOUNT;
     else
