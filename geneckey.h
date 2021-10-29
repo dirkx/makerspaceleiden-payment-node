@@ -3,5 +3,5 @@
 #include "mbedtls/pk.h"
 #include "mbedtls/ecdsa.h"
 
-mbedtls_ecp_keypair * genkey();
+int geneckey(mbedtls_pk_context *key);
 #endif

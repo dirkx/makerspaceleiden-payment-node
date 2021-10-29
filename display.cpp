@@ -1,9 +1,7 @@
-#include <Arduino.h>
-#include <SPI.h>
-#include <TFT_eSPI.h>
-#include <MFRC522.h>
 
+#include "global.h"
 #include "display.h"
+#include "rest.h"
 
 #include "NotoSansMedium8.h"
 #define AA_FONT_TINY  NotoSansMedium8
@@ -26,20 +24,6 @@
 
 TFT_eSPI tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
 TFT_eSprite spr = TFT_eSprite(&tft);
-
-extern int NA;
-extern char **amounts;
-extern char **prices;
-extern char **descs;
-extern int amount;
-extern int default_item ;
-typedef enum { BOOT = 0, REGISTER, REGISTER_SWIPE, REGISTER_FAIL, OEPSIE, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, FIRMWARE_UPDATE, FIRMWARE_FAIL } state_t;
-extern state_t md;
-#define VERSION "1.02-test"
-extern int setupPrices(char *tag);
-extern char tag[48]; 
-extern int payByREST(char *tag, char * amount, char *lbl);
-extern String label;
 
 void setupTFT() {
   tft.init();
@@ -122,7 +106,6 @@ void updateDisplay()
 {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  Serial.printf("updateDisplay %d\n", md);
 
   tft.setTextDatum(MC_DATUM);
   switch (md) {
@@ -134,7 +117,7 @@ void updateDisplay()
 
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
-      tft.drawString(VERSION, tft.width() / 2, tft.height() / 2 + 26);
+      tft.drawString(version, tft.width() / 2, tft.height() / 2 + 26);
       tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 42);
       tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 60);
       break;
@@ -143,30 +126,15 @@ void updateDisplay()
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
       tft.drawString("registering...", tft.width() / 2, tft.height() / 2 - 0);
-      setupPrices(NULL);
       break;
-#ifdef V2
-    case REGISTER_SWIPE:
+    case WAIT_FOR_REGISTER_SWIPE:
       showLogo();
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("unknown terminal", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("new terminal", tft.width() / 2, tft.height() / 2 - 10);
+      tft.loadFont(AA_FONT_MEDIUM);
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.drawString("swipe admin tag", tft.width() / 2, tft.height() / 2 + 10);
-      for (int i = 100; i; i--) {
-        unsigned long lst = millis();
-        char buff[32]; snprintf(buff, sizeof(buff), "   % d   ", i);
-        tft.drawString(buff, tft.width() / 2, tft.height() / 2 - 30);
-        while (millis() < lst + 1000) {
-          if (loopRFID()) {
-            tft.drawString(" ?? ? ", tft.width() / 2, tft.height() / 2 - 30);
-            if (setupPrices(tag) == 200) {
-              md = ENTER_AMOUNT;
-              break;
-            };
-          };
-        }
-      }
+      tft.drawString("swipe admin tag", tft.width() / 2, tft.height() / 2 + 20);
       break;
     case REGISTER_FAIL:
       showLogo();
@@ -182,8 +150,6 @@ void updateDisplay()
       tft.fillScreen(TFT_BLACK);
       esp_deep_sleep_start();
       break;
-#endif
-
     case ENTER_AMOUNT:
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
@@ -274,6 +240,14 @@ void updateClock(char * str) {
   tft.loadFont(AA_FONT_TINY);
   tft.drawString(str, tft.width(), 0);
 };
+
+void updateDisplay_progressText(char * str) {
+  Serial.println(str);
+  updateDisplay();
+  tft.setTextDatum(MC_DATUM);
+  tft.loadFont(AA_FONT_MEDIUM);
+  tft.drawString(str, tft.width() / 2,  tft.height() - 20);
+}
 
 void displayForceShowError(char * str) {
   state_t prev = md;

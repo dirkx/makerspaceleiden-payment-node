@@ -11,6 +11,7 @@ void setupTFT();
 void scrollpanel_loop();
 void updateDisplay_progressBar(float p);
 void updateDisplay();
+void updateDisplay_progressText(char * str);
 void displayForceShowError(char * str);
 void updateClock(char * str);
 #endif
