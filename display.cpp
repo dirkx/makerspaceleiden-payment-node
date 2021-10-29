@@ -125,7 +125,7 @@ void updateDisplay()
       showLogo();
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("fetching CA...", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("security...", tft.width() / 2, tft.height() / 2 - 10);
       break;
     case REGISTER:
       showLogo();
@@ -137,7 +137,7 @@ void updateDisplay()
       showLogo();
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("pricelist", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("prices...", tft.width() / 2, tft.height() / 2 - 10);
       break;
     case WAIT_FOR_REGISTER_SWIPE:
       showLogo();
