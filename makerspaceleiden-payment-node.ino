@@ -43,9 +43,6 @@ char terminalName[64];
 #include "rest.h"
 #include "ota.h"
 
-// #include "pins_tft177.h" // 1.77" boards
-#include "pins_ttgo.h" // TTGO unit with own buttons; no LEDs.
-
 
 #ifdef BOARD_V2XXXX
 Button2 btn1(BUTTON_1, INPUT, false, true /* active low */);
@@ -65,6 +62,9 @@ int amount = 0;
 int default_item = -1;
 double amount_no_ok_needed = AMOUNT_NO_OK_NEEDED;
 const char * version = VERSION;
+
+// Hardcode for Europe (ESP32/Espresifs defaults for CEST seem wrong)./
+const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 
 // values above this amount will get an extra 'OK' question.
 
@@ -127,9 +127,10 @@ bool loopRFID() {
 // will reboot the unit early mornings.
 //
 void updateTimeAndRebootAtMidnight(bool force) {
-  // we keep a space in front; to wipe any (longer) strings). At
+  // we keep a space in front; to wipe any (longer) strings). As
   // the font is not monospaced.
-  static char lst[12] = { ' ' };
+  //
+  static char lst[16] = { ' ', ' ' };
   time_t now = time(nullptr);
   char * p = ctime(&now);
 
@@ -137,14 +138,16 @@ void updateTimeAndRebootAtMidnight(bool force) {
   if (millis() - debug > 60 * 60 * 1000) {
     debug = millis();
     Serial.print(p);
+    Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
   }
 
   p += 11;
   p[5] = 0; // or use 8 to also show seconds.
 
-  if ((strcmp(lst + 1, p) == 0) && (force == false))
+  if ((strcmp(lst + 2, p) == 0) && (force == false))
     return;
-  strcpy(lst + 1, p);
+
+  strcpy(lst + 2, p);
   updateClock(p);
 
 #ifdef AUTO_REBOOT_TIME
@@ -170,7 +173,9 @@ void settupButtons()
     };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
-//      if (amount + 1 < NA)
+#ifndef ENDLESS
+      if (amount + 1 < NA)
+#endif
         amount = (amount + 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_OK;
@@ -187,7 +192,9 @@ void settupButtons()
     };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
-//      if (amount > 0 )
+#ifndef ENDLESS
+      if (amount > 0 )
+#endif
         amount = (amount + NA - 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_CANCEL;
@@ -213,6 +220,8 @@ void setupLEDS()
   pinMode(LED_2, OUTPUT);
   digitalWrite(LED_1, 0);
   digitalWrite(LED_2, 0);
+  delay(50);
+  led_loop();
 #endif
 }
 
@@ -220,10 +229,15 @@ void led_loop() {
 #ifdef LED_1
   switch (md) {
     case ENTER_AMOUNT:
+#ifdef ENDLESS
       // Visibly dim the buttons at the end of the strip; as current 'wrap around'
       // is not endless.
-      analogWrite(LED_1, amount + 1 == NA ? 220 : 0);
-      analogWrite(LED_2, amount == 0 ? 220 : 0);
+      analogWrite(LED_1, NORMAL_LED_BRIGHTNESS);
+      analogWrite(LED_2, NORMAL_LED_BRIGHTNESS);
+#else
+      analogWrite(LED_1, amount + 1 == NA ? NORMAL_LED_BRIGHTNESS : 0);
+      analogWrite(LED_2, amount == 0 ? NORMAL_LED_BRIGHTNESS : 0);
+#endif
       break;
     case OK_OR_CANCEL:
       digitalWrite(LED_1, 0);
@@ -248,7 +262,7 @@ void setup()
 
   Serial.print("Start " );
   Serial.println(terminalName);
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
 
 
 #ifdef LED_1
@@ -279,13 +293,12 @@ void setup()
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   //
-  configTime(2 * 3600 /* hardcode CET/CEST */, 3600, "nl.pool.ntp.org");
+  configTzTime(cestTimezone, "nl.pool.ntp.org");
 
   md = WAITING_FOR_NTP;
-  updateDisplay();
   updateDisplay_progressText("Waiting for NTP");
   Serial.println("Starting loop");
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
 }
 
 void loop()
@@ -304,6 +317,7 @@ void loop()
     case WAITING_FOR_NTP:
       if (time(nullptr) > 3600)
         md = FETCH_CA;
+      return;
       break;
     case FETCH_CA:
       fetchCA();
@@ -365,5 +379,6 @@ void loop()
   if (update) {
     update = false;
     updateDisplay();
+    updateTimeAndRebootAtMidnight(true);
   }
 }

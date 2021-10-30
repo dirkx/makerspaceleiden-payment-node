@@ -58,8 +58,16 @@
 // Hopefully enough HEAP to have the 2 sprites.
 #define SPRITESCROLL  
 
+// Endless scrolling or stop at begin/end
+#define ENDLESS
+
+// Full on is a bit bright relative to the screen; so we safe
+// that for errors/special cases.
+//
+#define NORMAL_LED_BRIGHTNESS 220
+
 // undef if you do not want the screensaver
-#define SCREENSAVER_TIMEOUT (15*60*1000 /* 15 mins */)
+#define SCREENSAVER_TIMEOUT (15 * 60 * 1000 /* 15 mins */)
 
 #define AMOUNT_NO_OK_NEEDED (5.0)
 

@@ -28,3 +28,5 @@
 #define RFID_CS             25  // ok
 #define RFID_RESET          17  // shared with screen
 #define RFID_IRQ             3
+
+#define TFT_ROTATION 3

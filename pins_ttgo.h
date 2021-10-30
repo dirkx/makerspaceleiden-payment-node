@@ -12,7 +12,7 @@
 
 #define BUTTON_1            35
 #define BUTTON_2            0
- 
+
 #define RFID_CS       12 // SDA on board, SS in library
 #define RFID_SCLK     13
 #define RFID_MOSI     15
@@ -20,3 +20,5 @@
 #define RFID_RESET    21
 
 #define TFT_BL        14
+
+#define TFT_ROTATION 1
