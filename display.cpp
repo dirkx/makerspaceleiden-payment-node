@@ -31,23 +31,27 @@ void setupTFT() {
 #ifndef _H_BLUEA160x128
   tft.setSwapBytes(true);
 #endif
-  spr.createSprite(3 * tft.width(), 68);
+#ifdef SPRITESCROLL
+  spr.createSprite(2 * tft.width(), 68);
+#else
+  spr.createSprite(1 * tft.width(), 68);
+#endif
 }
 
-void showLogo() {
+static void showLogo() {
   tft.pushImage(
     (tft.width() - msl_logo_map_width) / 2, 10, // (tft.height() - msl_logo_map_width) ,
     msl_logo_map_width, msl_logo_map_width,
     (uint16_t *)  msl_logo_map);
 }
 
-void drawPricePanel(int offset, int amount) {
-  spr.setTextDatum(TC_DATUM);
+// We keep the price planel on a sprite; so it mecomes easier
+// scroll smoothly without flickering as we do not have enough
+// memory for double buffering.
+//
+static void drawPricePanel(int offset, int amount) {
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.loadFont(AA_FONT_HUGE);
-  if (amount >= NA)
-    return;
-
   spr.drawString(amounts[amount], offset + tft.width() / 2, 2);
   spr.setTextColor(TFT_YELLOW, TFT_BLACK);
 
@@ -57,39 +61,66 @@ void drawPricePanel(int offset, int amount) {
   spr.drawString(prices[amount], offset + tft.width() / 2, 56);
 };
 
-// What you see on the screen is actually the middle price panel;
-// with two price panels either side. This is so we an smoothly
-// scroll to the left or right; without having to redraw the next
-// value right away/dynamically.
-void prepareScrollpanels() {
+static void drawPricePanels(int left, int right) {
   spr.fillSprite(TFT_BLACK);
-  drawPricePanel(0 * tft.width() , (amount - 1 + NA) % NA);
-  drawPricePanel(1 * tft.width() , amount);
-  drawPricePanel(2 * tft.width() , (amount + 1) % NA);
+  spr.setTextDatum(TC_DATUM);
+  drawPricePanel(0, left);
+  drawPricePanel( tft.width() , right);
 }
 
-void scrollpanel_loop() {
-  static int last_amount = NA;
-  if (amount == last_amount)
-    return;
-
-  prepareScrollpanels();
-  for (int x = 0; x < tft.width() + 4 /* intentional overshoot */; x++) {
-    int ox = x;
-    if (last_amount > amount)
-      ox =   2 * tft.width() - x;
-    spr.pushSprite(-ox, 32 );
-
+static int slide_speed(int x) {
 #if SPRING_STYLE
-    int s = fabs(ox -  tft.width() / 2) / 10; // <-- spring style
+  int s = fabs(x -  tft.width() / 2) / 10; // <-- spring style
 #else
-    int s = abs(tft.width() / 2 - fabs(ox -  tft.width() / 2)) / 10; // <-- click style
+  int s = abs(tft.width() / 2 - fabs(x -  tft.width() / 2)) / 10; // <-- click style
 #endif
-    x += s;
+  if (s < 1) s = 1;
+  return s;
+}
+
+static void scrollpanel_loop() {
+#ifdef SPRITESCROLL
+  static int last_amount = amount;
+  if (amount == last_amount) {
+    Serial.printf("in place %d / %d", amount, last_amount);
+#endif
+    drawPricePanel(0, amount);
+    spr.pushSprite(0, 32);
+    return;
+#ifdef SPRITESCROLL
+  };
+  /* Right
+   * 0 1   1
+   * 1 2   
+   * 2 3
+   * 3 0   
+   * 0 1   
+   * Left
+   * 0 3
+   * 3 2
+   * 2 1
+   * 1 0
+   * 0 3
+   */
+  Serial.printf("Last %d New %d and # %d\n", last_amount, amount, NA);
+  if ((amount - last_amount + NA) % NA ==1) {
+    Serial.println("Move Right");
+    drawPricePanels(last_amount, amount);
+
+    for (int x = 0; x < tft.width() + 4 /* intentional overshoot */;  x += slide_speed(x)) {
+      spr.pushSprite(-x, 32 );
+    }
+    spr.pushSprite(tft.width(), 32);
+  } else {
+    Serial.println("Move Left");
+    drawPricePanels( amount, last_amount);
+    for (int x = 0; x < tft.width() + 4 /* intentional overshoot */; x += slide_speed(x)) {
+      spr.pushSprite(-tft.width() + x, 32 );
+    }
+    spr.pushSprite(0, 32);
   }
-  // 'click back'
-  spr.pushSprite(- tft.width(), 32);
   last_amount = amount;
+#endif
 }
 
 void updateDisplay_progressBar(float p)
@@ -119,6 +150,12 @@ void updateDisplay()
       tft.drawString(version, tft.width() / 2, tft.height() / 2 + 26);
       tft.drawString(__DATE__, tft.width() / 2, tft.height() / 2 + 42);
       tft.drawString(__TIME__, tft.width() / 2, tft.height() / 2 + 60);
+      break;
+    case WAITING_FOR_NTP:
+      showLogo();
+      tft.loadFont(AA_FONT_LARGE);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString("time...", tft.width() / 2, tft.height() / 2 - 10);
       break;
     case FETCH_CA:
       showLogo();
@@ -166,8 +203,7 @@ void updateDisplay()
       tft.loadFont(AA_FONT_LARGE);
       if (NA) {
         tft.drawString("Swipe to pay", tft.width() / 2, 20);
-        prepareScrollpanels();
-        spr.pushSprite(- tft.width(), 32);
+        scrollpanel_loop();
       } else {
         tft.drawString("- no articles -", tft.width() / 2, 20);
       }
@@ -272,13 +308,16 @@ void displayForceShowError(char * str) {
 
 void setTFTPower(bool onoff) {
   Serial.println(onoff ? "Powering display on" : "Powering display off");
+#ifdef  TFT_BL
+  digitalWrite(TFT_BL, onoff);
+#endif
 #ifdef ST7735_DISPON
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
 #else
 #ifdef ST7789_DISPON
   tft.writecommand(onoff ? ST7789_DISPON : ST7789_DISPOFF);
 #else
-#error "No onoff"
+#error "No onoff driver for this TFT screen"
 #endif
 #endif
   delay(100);

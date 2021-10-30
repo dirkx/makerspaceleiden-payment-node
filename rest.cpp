@@ -87,6 +87,7 @@ bool getks(Preferences keystore, const char * key, char ** dst) {
   return true;
 }
 
+bool paired = false;
 
 state_t setupAuth(const char * terminalName) {
   mbedtls_x509write_cert crt;
@@ -94,8 +95,6 @@ state_t setupAuth(const char * terminalName) {
   Preferences keystore;
   state_t ret = REGISTER;
   char tmp[65];
-
-  return ret;
 
   if (!keystore.begin(KS_NAME, false))
     Serial.println("Keystore open failed");
@@ -130,6 +129,7 @@ state_t setupAuth(const char * terminalName) {
     };
   } else {
     Serial.printf("Using existing keys (keystore version 0x%03x), fully configured\n", version);
+    paired = true;
   }
   keystore.end();
   fingerprint_from_pem(client_cert_as_pem, sha256_client);
@@ -165,7 +165,7 @@ bool fetchCA() {
     Serial.println("HTTPClient creation failed.");
     goto exit;
   }
-  Serial.print("Heap L "); Serial.println(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
 
   // Sadly required - due to a limitation in the current SSL stack we must
   // provide the root CA. but we do not know it (yet). So learn it first.
@@ -192,9 +192,11 @@ bool fetchCA() {
   ca_root = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
 
   updateDisplay_progressText("CA Cert fetched");
-  if (client_key_as_pem)
-    md = REGISTER_PRICELIST;
-
+  if (paired)
+     md = REGISTER_PRICELIST;
+  else
+    md = REGISTER;
+    
   ok = true;
 exit:
   https->end();
@@ -221,7 +223,6 @@ bool registerDevice() {
     Serial.println("WiFiClientSecure creation failed.");
     goto exit;
   }
-
 
   client->setCACert(ca_root);
   client->setCertificate(client_cert_as_pem);
@@ -263,6 +264,7 @@ bool registerDevice() {
     mbedtls_sha256_context sha_ctx;
     mbedtls_sha256_init(&sha_ctx);
     mbedtls_sha256_starts_ret(&sha_ctx, 0);
+    
     // we happen to know that the first two can safely be treated as strings.
     //
     mbedtls_sha256_update_ret(&sha_ctx, (unsigned char*) nonce, strlen(nonce));

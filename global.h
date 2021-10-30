@@ -55,13 +55,15 @@
 // Reboot every day (or comment this out).
 #define AUTO_REBOOT_TIME "04:00"
 
+// Hopefully enough HEAP to have the 2 sprites.
+#define SPRITESCROLL  
 
 // undef if you do not want the screensaver
 #define SCREENSAVER_TIMEOUT (15*60*1000 /* 15 mins */)
 
 #define AMOUNT_NO_OK_NEEDED (5.0)
 
-typedef enum { BOOT = 0, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
+typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
 
 // keep all ugly globals in one place for now.
 //

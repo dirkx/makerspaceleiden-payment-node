@@ -25,22 +25,13 @@
 //    Arduino_JSON
 //    ESP32_AnalogWrite
 
-// Manual config:
-//    Once TFT_eSPI is installed - it needs to be configured to select the right board.
-//    Go to .../Arduino/library/TFT_eSPI and open the file "User_Setup_Select.h".
-//    Uncomment the line with that says:
-//       // #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
-//    and chagne it to:
-//       #include <User_Setups/Setup25_TTGO_T_Display.h>    // Setup file for ESP32 and TTGO T-Display ST7789V SPI bus TFT
-//    i.e. remove the first two // characters. Then save it again in the same place.
-//
-
 char terminalName[64];
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <SPI.h>
 #include <ESPmDNS.h>
+#include "esp_heap_caps.h"
 
 #include <MFRC522.h>
 #include <Button2.h>
@@ -179,14 +170,14 @@ void settupButtons()
     };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
-      if (amount + 1 < NA)
+//      if (amount + 1 < NA)
         amount = (amount + 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_OK;
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
     if (l != amount)
-      Serial.println("B1");
+      Serial.println("left");
   });
 
   btn2.setPressedHandler([](Button2 & b) {
@@ -196,7 +187,7 @@ void settupButtons()
     };
     int l = amount;
     if (md == ENTER_AMOUNT && NA)
-      if (amount > 0 )
+//      if (amount > 0 )
         amount = (amount + NA - 1) % NA;
     if (md == OK_OR_CANCEL)
       md = DID_CANCEL;
@@ -204,7 +195,7 @@ void settupButtons()
     update = update || (md != ENTER_AMOUNT) || (l != amount);
 
     if (l != amount) {
-      Serial.println("B2");
+      Serial.println("right");
     }
   });
 }
@@ -257,6 +248,7 @@ void setup()
 
   Serial.print("Start " );
   Serial.println(terminalName);
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
 
 
 #ifdef LED_1
@@ -268,35 +260,38 @@ void setup()
 
   setupRFID();
   settupButtons();
-  md = setupAuth(terminalName);
+  setupAuth(terminalName);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
   WiFi.setHostname(terminalName);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    displayForceShowError((char *)"NET Fail");
+    displayForceShowError((char *)"Wifi Problem");
     delay(5000);
     ESP.restart();
   }
   Serial.printf("Joined WiFi:%s as ", WIFI_NETWORK);
   Serial.println(WiFi.localIP());
 
-  setupOTA();
+  // setupOTA();
 
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   //
-  updateDisplay_progressText("Waiting for NTP");
   configTime(2 * 3600 /* hardcode CET/CEST */, 3600, "nl.pool.ntp.org");
 
-  md = FETCH_CA;
+  md = WAITING_FOR_NTP;
+  updateDisplay();
+  updateDisplay_progressText("Waiting for NTP");
+  Serial.println("Starting loop");
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
 }
 
 void loop()
 {
   static unsigned long lastchange = 0;
-  static state_t laststate = OEPSIE;
+  static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
   updateTimeAndRebootAtMidnight(false);
   ota_loop();
@@ -306,15 +301,11 @@ void loop()
 #endif
 
   switch (md) {
+    case WAITING_FOR_NTP:
+      if (time(nullptr) > 3600)
+        md = FETCH_CA;
+      break;
     case FETCH_CA:
-      {
-        // Wait for the NTP to have set the clock - to prevent SSL funnyness. Will break in 2038.
-        //
-        time_t now = time(nullptr);
-        if (now < 3600) {
-          return;
-        };
-      };
       fetchCA();
       return;
     case REGISTER:
@@ -340,7 +331,6 @@ void loop()
         update = true;
       };
       if (NA > 0) {
-        scrollpanel_loop();
         if (loopRFID()) {
           md = (atof(prices[amount]) < AMOUNT_NO_OK_NEEDED) ?  DID_OK : OK_OR_CANCEL;
           update = true;
