@@ -130,16 +130,16 @@ void updateTimeAndRebootAtMidnight(bool force) {
   // we keep a space in front; to wipe any (longer) strings). As
   // the font is not monospaced.
   //
-  static char lst[16] = { ' ', ' ' };
-  time_t now = time(nullptr);
-  char * p = ctime(&now);
-
   static unsigned long debug = 0;
   if (millis() - debug > 60 * 60 * 1000) {
     debug = millis();
     Serial.print(p);
     Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
   }
+
+  static char lst[16] = { ' ', ' ' };
+  time_t now = time(nullptr);
+  char * p = ctime(&now);
 
   p += 11;
   p[5] = 0; // or use 8 to also show seconds.
@@ -148,7 +148,10 @@ void updateTimeAndRebootAtMidnight(bool force) {
     return;
 
   strcpy(lst + 2, p);
-  updateClock(p);
+
+  // only show the lock post NTP sync.
+  if (now > 10000)
+    updateClock(p);
 
 #ifdef AUTO_REBOOT_TIME
   static unsigned long reboot_offset = random(3600);
@@ -181,8 +184,7 @@ void settupButtons()
       md = DID_OK;
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
-    if (l != amount)
-      Serial.println("left");
+    // if (l != amount) Serial.println("left");
   });
 
   btn2.setPressedHandler([](Button2 & b) {
@@ -201,9 +203,7 @@ void settupButtons()
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
 
-    if (l != amount) {
-      Serial.println("right");
-    }
+    //    if (l != amount) Serial.println("right");
   });
 }
 

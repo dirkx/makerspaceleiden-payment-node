@@ -40,7 +40,7 @@ void setupTFT() {
 
 static void showLogo() {
   tft.pushImage(
-    (tft.width() - msl_logo_map_width) / 2, 10, // (tft.height() - msl_logo_map_width) ,
+    (tft.width() - msl_logo_map_width) / 2, 0, // (tft.height() - msl_logo_map_width) ,
     msl_logo_map_width, msl_logo_map_width,
     (uint16_t *)  msl_logo_map);
 }
@@ -52,13 +52,14 @@ static void showLogo() {
 static void drawPricePanel(int offset, int amount) {
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
   spr.loadFont(AA_FONT_HUGE);
-  spr.drawString(amounts[amount], offset + tft.width() / 2, 2);
+  spr.drawString(amounts[amount], offset + tft.width() / 2, 0);
   spr.setTextColor(TFT_YELLOW, TFT_BLACK);
 
   spr.loadFont(AA_FONT_SMALL);
-  spr.drawString(descs[amount], offset + tft.width() / 2, 40);
-  spr.loadFont(AA_FONT_MEDIUM);
-  spr.drawString(prices[amount], offset + tft.width() / 2, 56);
+  spr.drawString(descs[amount], offset + tft.width() / 2, 39);
+
+  spr.loadFont(AA_FONT_LARGE);
+  spr.drawString(prices[amount], offset + tft.width() / 2, spr.height()-16); // we know it is only digits.
 };
 
 static void drawPricePanels(int left, int right) {
@@ -124,7 +125,7 @@ void updateDisplay()
       showLogo();
       tft.loadFont(AA_FONT_HUGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("paynode", tft.width() / 2, tft.height() / 2 - 0);
+      tft.drawString("paynode", tft.width() / 2, tft.height() / 2 - 10);
 
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
