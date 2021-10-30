@@ -127,6 +127,10 @@ bool loopRFID() {
 // will reboot the unit early mornings.
 //
 void updateTimeAndRebootAtMidnight(bool force) {
+  static char lst[16] = { ' ', ' ' };
+  time_t now = time(nullptr);
+  char * p = ctime(&now);
+
   // we keep a space in front; to wipe any (longer) strings). As
   // the font is not monospaced.
   //
@@ -136,10 +140,6 @@ void updateTimeAndRebootAtMidnight(bool force) {
     Serial.print(p);
     Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
   }
-
-  static char lst[16] = { ' ', ' ' };
-  time_t now = time(nullptr);
-  char * p = ctime(&now);
 
   p += 11;
   p[5] = 0; // or use 8 to also show seconds.
@@ -171,7 +171,7 @@ void settupButtons()
 {
   btn1.setPressedHandler([](Button2 & b) {
     if (md == SCREENSAVER) {
-      update = true; md = ENTER_AMOUNT;
+      update = true;
       return;
     };
     int l = amount;
@@ -189,7 +189,7 @@ void settupButtons()
 
   btn2.setPressedHandler([](Button2 & b) {
     if (md == SCREENSAVER) {
-      update = true; md = ENTER_AMOUNT;
+      update = true;
       return;
     };
     int l = amount;
@@ -293,7 +293,7 @@ void setup()
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   //
-  configTzTime(cestTimezone, "nl.pool.ntp.org");
+  configTzTime(cestTimezone, NTP_POOL);
 
   md = WAITING_FOR_NTP;
   updateDisplay_progressText("Waiting for NTP");
@@ -333,9 +333,17 @@ void loop()
       if (fetchPricelist())
         md = ENTER_AMOUNT;
       return;
+    case SCREENSAVER:
+      if (update) {
+        Serial.println("Wakeup");
+        setTFTPower(true);
+        md = ENTER_AMOUNT;
+      };
+      break;
     case ENTER_AMOUNT:
       if (millis() - lastchange > SCREENSAVER_TIMEOUT) {
         md = SCREENSAVER;
+        Serial.println("Enabling screensaver (from enter)");
         setTFTPower(false);
         return;
       };
@@ -355,9 +363,6 @@ void loop()
   };
 
   if (md != laststate || last_amount != amount) {
-    if (laststate == SCREENSAVER && md != SCREENSAVER) {
-      setTFTPower(true);
-    };
     laststate = md;
     lastchange = millis();
     last_amount = amount;

@@ -27,23 +27,9 @@
 #define WIFI_PASSWD "MyWifiPassword"
 #endif
 
-#ifndef PAYMENT_TERMINAL_BEARER
-// Must match line 245 in  makerspaceleiden/settings.py of https://github.com/MakerSpaceLeiden/makerspaceleiden-crm
-#define PAYMENT_TERMINAL_BEARER "not-so-very-secret-127.0.0.1"
+#ifndef PAY_URL
+#define PAY_URL "https://test.makerspaceleiden.nl:4443/crm/pettycash/api"
 #endif
-
-#ifndef PAYMENT_URL
-#define PAYMENT_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
-#endif
-
-#ifndef SDU_URL
-#define SDU_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
-#endif
-
-#ifndef SDU_URL
-#define SDU_URL "https://test.makerspaceleiden.nl/test-server-crm/api/v1/pay"
-#endif
-
 
 #define HTTP_TIMEOUT (5000)
 
@@ -70,6 +56,10 @@
 #define SCREENSAVER_TIMEOUT (15 * 60 * 1000 /* 15 mins */)
 
 #define AMOUNT_NO_OK_NEEDED (5.0)
+
+#ifndef NTP_POOL
+#define NTP_POOL "nl.pool.ntp.org"
+#endif
 
 typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
 

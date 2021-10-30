@@ -42,12 +42,13 @@ const char * KS_KEY_CLIENT_CRT = "ccap";
 const char * KS_KEY_CLIENT_KEY = "ckap";
 const char * KS_KEY_SERVER_KEY = "ssk";
 
+const char * stationname = NULL;
+
 const unsigned short KS_VERSION = 0x100;
 
-#define URL_NONE "https://makerspaceleiden.nl:4443/crm/pettycash/api/none"
-
-#define URL "https://makerspaceleiden.nl:4443/crm/pettycash"
-#define REGISTER_PATH "/api/v2/register"
+#define NONE_PATH "/none"
+#define REGISTER_PATH "/v2/register"
+#define PAY_PATH "/v2/pay"
 
 static unsigned char hex_digit(unsigned char c) {
   return "0123456789ABCDEF"[c & 0x0F];
@@ -165,13 +166,13 @@ bool fetchCA() {
     Serial.println("HTTPClient creation failed.");
     goto exit;
   }
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
+  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
 
   // Sadly required - due to a limitation in the current SSL stack we must
   // provide the root CA. but we do not know it (yet). So learn it first.
   //
   client->setInsecure();
-  if (!https->begin(*client, URL_NONE )) {
+  if (!https->begin(*client, PAY_URL NONE_PATH )) {
     Serial.println("Failed to begin https - fetchCA");
     goto exit;
   };
@@ -193,10 +194,10 @@ bool fetchCA() {
 
   updateDisplay_progressText("CA Cert fetched");
   if (paired)
-     md = REGISTER_PRICELIST;
+    md = REGISTER_PRICELIST;
   else
     md = REGISTER;
-    
+
   ok = true;
 exit:
   https->end();
@@ -229,7 +230,7 @@ bool registerDevice() {
   client->setPrivateKey(client_key_as_pem);
 
   if (md == REGISTER) {
-    snprintf((char *) buff, sizeof(buff),  URL REGISTER_PATH "?name=%s",
+    snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?name=%s",
              _argencode((char *) tmp, sizeof(tmp), terminalName));
 
     if (!https.begin(*client, (const char*)buff)) {
@@ -264,7 +265,7 @@ bool registerDevice() {
     mbedtls_sha256_context sha_ctx;
     mbedtls_sha256_init(&sha_ctx);
     mbedtls_sha256_starts_ret(&sha_ctx, 0);
-    
+
     // we happen to know that the first two can safely be treated as strings.
     //
     mbedtls_sha256_update_ret(&sha_ctx, (unsigned char*) nonce, strlen(nonce));
@@ -275,7 +276,7 @@ bool registerDevice() {
     sha256toHEX(sha256, (char*)tmp);
     mbedtls_sha256_free(&sha_ctx);
 
-    snprintf((char *) buff, sizeof(buff),  URL REGISTER_PATH "?response=%s", (char *)tmp);
+    snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?response=%s", (char *)tmp);
 
     if (!https.begin(*client, (char *)buff )) {
       Serial.println("Failed to begin https");
@@ -430,22 +431,21 @@ exit:
   return res;
 }
 
-
 int payByREST(char *tag, char * amount, char *lbl) {
   char buff[512];
   char desc[128];
   char tmp[128];
 
-  snprintf(desc, sizeof(desc), "%s. Payment at terminal %s", lbl, terminalName);
+  snprintf(desc, sizeof(desc), "%s. Paid at %s", lbl, stationname);
 
   // avoid logging the tag for privacy/security-by-obscurity reasons.
   //
-  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
+  snprintf(buff, sizeof(buff), PAY_URL PAY_PATH "?node=%s&src=%s&amount=%s&description=%s",
            terminalName, "XX-XX-XX-XXX", amount, _argencode(tmp, sizeof(tmp), desc));
   Serial.print("URL : ");
   Serial.println(buff);
 
-  snprintf(buff, sizeof(buff), PAYMENT_URL "?node=%s&src=%s&amount=%s&description=%s",
+  snprintf(buff, sizeof(buff), PAY_URL PAY_PATH "?node=%s&src=%s&amount=%s&description=%s",
            terminalName, tag, amount, _argencode(tmp, sizeof(tmp), desc));
 
   int httpCode = 0;
@@ -472,18 +472,28 @@ bool fetchPricelist() {
 
   updateDisplay_progressText("fetching prices");
 
-  JSONVar res = rest(URL REGISTER_PATH, &httpCode);
+  JSONVar res = rest(PAY_URL REGISTER_PATH, &httpCode);
+  if (httpCode == 400) {
+    // propably too soon/fast
+    updateDisplay_progressText("re-pairing wit existing key");
+    md = REGISTER;
+  };
   if (httpCode != 200) {
     Serial.println("SKU price list fetch failed.");
     return false;
   }
 
-  const char * nme = res["name"]; // need to strdup them if we weant to use them elsewhere.
+  const char * nme = res["name"];
   const char * desc = res["description"];
   if (!nme || !strlen(nme)) {
     Serial.println("Bogus SKU or not yet assiged a station");
+    updateDisplay_progressText("no station assigned in CRM");
     return false;
   }
+  if (desc && strlen(desc))
+    stationname = strdup(desc);
+  else
+    stationname = terminalName;
 
   len = res["pricelist"].length();
   if (len < 0 || len > 256) {

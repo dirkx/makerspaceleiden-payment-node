@@ -155,7 +155,7 @@ void updateDisplay()
       showLogo();
       tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("get prices...", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("pricelist...", tft.width() / 2, tft.height() / 2 - 10);
       break;
     case WAIT_FOR_REGISTER_SWIPE:
       showLogo();
@@ -215,7 +215,6 @@ void updateDisplay()
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
-      Serial.println("DID_OK");
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
@@ -291,7 +290,7 @@ void displayForceShowError(char * str) {
 void setTFTPower(bool onoff) {
   Serial.println(onoff ? "Powering display on" : "Powering display off");
 #ifdef  TFT_BL
-  digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : !TFT_BACKLIGHT_ON);
+  digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 #ifdef ST7735_DISPON
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
