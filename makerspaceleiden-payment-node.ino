@@ -271,7 +271,7 @@ void setup()
   
   byte mac[6];
   WiFi.macAddress(mac);
-  snprintf(terminalName,  sizeof(terminalName), "%s-%02x%02x%02x", TERMINAL_NAME, mac[3], mac[4], mac[5]);
+  snprintf(terminalName,  sizeof(terminalName), "%s-%s-%02x%02x%02x", TERMINAL_NAME, VERSION, mac[3], mac[4], mac[5]);
 
   Serial.print("Start   : " );
   Serial.println(terminalName);

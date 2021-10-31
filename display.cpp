@@ -354,7 +354,7 @@ void displayForceShowError(char * str) {
 void setTFTPower(bool onoff) {
   Serial.println(onoff ? "Powering display on" : "Powering display off");
 #ifdef  TFT_BL
-  digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+  if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 #ifdef ST7735_DISPON
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
@@ -366,4 +366,7 @@ void setTFTPower(bool onoff) {
 #endif
 #endif
   delay(100);
+#ifdef  TFT_BL
+  if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+#endif
 }

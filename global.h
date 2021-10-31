@@ -13,10 +13,10 @@
 //
 #define BOARD_V2
 
-#define VERSION "1.02-test"
+#define VERSION "1.03"
 
 #ifndef TERMINAL_NAME
-#define TERMINAL_NAME "dispay"
+#define TERMINAL_NAME "tft"
 #endif
 
 #ifndef WIFI_NETWORK
