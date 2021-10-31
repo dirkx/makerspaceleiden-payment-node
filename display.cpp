@@ -1,4 +1,3 @@
-
 #include "global.h"
 #include "display.h"
 #include "rest.h"
@@ -38,6 +37,24 @@ void setupTFT() {
 #endif
 }
 
+
+void wifiIcon(int32_t x, int32_t  y) {
+  float ss = WiFi.RSSI();
+  if (!WiFi.isConnected() || ss == 0) {
+    tft.drawTriangle(x, y + 6, x + 10, y, x + 10, y + 6, TFT_RED);
+    return;
+  };
+
+  // Range is from -80 to -10 or so. Above 60 is ok.
+  ss = 5 * (75. + ss) / 40;
+
+  tft.fillRect(x, y, 10, 6, TFT_BLACK);
+  for (int s = 0; s < 5; s++) {
+    int32_t h = (s + 1 <  ss) ? (s + 2) : 1;
+    tft.fillRect(x + s * 2, y + 6 - h, 1, h,  (s + 1 <  ss) ? TFT_WHITE : TFT_YELLOW);
+  };
+};
+
 static void showLogo() {
   tft.pushImage(
     (tft.width() - msl_logo_map_width) / 2, 0, // (tft.height() - msl_logo_map_width) ,
@@ -59,7 +76,7 @@ static void drawPricePanel(int offset, int amount) {
   spr.drawString(descs[amount], offset + tft.width() / 2, 39);
 
   spr.loadFont(AA_FONT_LARGE);
-  spr.drawString(prices[amount], offset + tft.width() / 2, spr.height()-16); // we know it is only digits.
+  spr.drawString(prices[amount], offset + tft.width() / 2, spr.height() - 16); // we know it is only digits.
 };
 
 static void drawPricePanels(int left, int right) {
@@ -106,18 +123,30 @@ static void scrollpanel_loop() {
 #endif
 }
 
+static unsigned short lastw = -1;
+void  updateDisplay_startProgressBar(char *str) {
+  tft.fillScreen(TFT_BLACK);
+  showLogo();
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.loadFont(AA_FONT_LARGE);
+  tft.drawString(str, tft.width() / 2, tft.height() / 2 - 10);
+  lastw = -10;
+  tft.drawRect(20, tft.height() - 40, tft.width() - 40, 20, TFT_WHITE);
+  updateDisplay_progressBar(0.0);
+};
+
 void updateDisplay_progressBar(float p)
-{
-  unsigned short w = (tft.width() - 48 - 4) * p;
-  static unsigned short lastw = -1;
-  if (w = lastw) return;
-  tft.fillRect(20 + 2, tft.height() - 60 + 2, w, 20 - 4, TFT_GREEN);
+{ unsigned short l = tft.width() - 48 - 4;
+  unsigned short w = l * p;
+  if (w == lastw) return;
+  tft.fillRect(20 + 2, tft.height() - 40 + 2, w, 20 - 4, TFT_GREEN);
   lastw = w;
 };
 
 void updateDisplay()
 {
   tft.fillScreen(TFT_BLACK);
+  updateClock(true);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
   switch (md) {
@@ -245,11 +274,7 @@ void updateDisplay()
       label = "";
       break;
     case FIRMWARE_UPDATE:
-      tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.loadFont(AA_FONT_LARGE);
-      tft.drawString("firmware update", tft.width() / 2, tft.height() / 2 - 22);
-      tft.drawRect(20, tft.height() - 60, tft.width() - 40, 20, TFT_WHITE);
-      updateDisplay_progressBar(0.0);
+      updateDisplay_startProgressBar("firmware update");
       break;
     case FIRMWARE_FAIL:
       tft.fillScreen(TFT_RED);
@@ -263,16 +288,55 @@ void updateDisplay()
   }
 }
 
-void updateClock(char * str) {
+void updateClock(bool force) {
+  static time_t last_now = 0;
+  time_t now = time(nullptr);
+  char str[32] = { ' ', ' ' };
+
+  if (!force) {
+    // only show the lock post NTP sync.
+    if (now < 1000)
+      return;
+
+    if (last_now == now || now % 60 != 0 || now - last_now < 60)
+      return;
+  };
+  last_now = now;
+
+  char * p = ctime(&now);
+  p += 11;
+  p[5] = 0; // or use 8 to also show seconds.
+
+  // we keep a space in front; to wipe any (longer) strings). As
+  // the font is not monospaced.
+  //
+  strcpy(str + 2, p);
+
   tft.setTextDatum(TR_DATUM);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.loadFont(AA_FONT_TINY);
   tft.drawString(str, tft.width(), 0);
+
+  wifiIcon(0, 0);
+  return;
+  tft.setTextDatum(TL_DATUM);
+  snprintf(str, sizeof(str), "%d Kb %d dBm", (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL, (int)WiFi.RSSI());
+  tft.drawString(str, 0, 0);
 };
 
 void updateDisplay_progressText(char * str) {
   Serial.println(str);
   updateDisplay();
+  tft.setTextDatum(MC_DATUM);
+  tft.loadFont(AA_FONT_MEDIUM);
+  tft.drawString(str, tft.width() / 2,  tft.height() - 20);
+}
+
+void updateDisplay_warningText(char * str) {
+  Serial.println(str);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  showLogo();
   tft.setTextDatum(MC_DATUM);
   tft.loadFont(AA_FONT_MEDIUM);
   tft.drawString(str, tft.width() / 2,  tft.height() - 20);

@@ -8,11 +8,14 @@ void setupTFT();
 
 void updateDisplay();
 
+void updateDisplay_startProgressBar(char *str);
 void updateDisplay_progressBar(float p);
+
 void updateDisplay_progressText(char * str);
 void displayForceShowError(char * str);
+void updateDisplay_warningText(char * str);
 
-void updateClock(char * str);
+void updateClock(bool force);
 
 void setTFTPower(bool onoff);
 #endif

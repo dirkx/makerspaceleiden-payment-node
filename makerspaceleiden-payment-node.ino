@@ -126,37 +126,28 @@ bool loopRFID() {
 // Updates the small clock in the top right corner; and
 // will reboot the unit early mornings.
 //
-void updateTimeAndRebootAtMidnight(bool force) {
-  static char lst[16] = { ' ', ' ' };
-  time_t now = time(nullptr);
-  char * p = ctime(&now);
+static void loop_RebootAtMidnight() {
+  static unsigned long lst = millis();
+  if (millis() - lst < 60 * 1000)
+    return;
+  lst = millis();
 
-  // we keep a space in front; to wipe any (longer) strings). As
-  // the font is not monospaced.
-  //
   static unsigned long debug = 0;
   if (millis() - debug > 60 * 60 * 1000) {
     debug = millis();
-    Serial.print(p);
-    Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
+    time_t now = time(nullptr);
+    char * p = ctime(&now);
+    p[5 + 11 + 3] = 0;
+    Serial.printf("%s Heap: %d Kb\n", p, (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
   }
-
-  p += 11;
-  p[5] = 0; // or use 8 to also show seconds.
-
-  if ((strcmp(lst + 2, p) == 0) && (force == false))
+  time_t now = time(nullptr);
+  if (now < 3600)
     return;
-
-  strcpy(lst + 2, p);
-
-  // only show the lock post NTP sync.
-  if (now > 10000)
-    updateClock(p);
 
 #ifdef AUTO_REBOOT_TIME
   static unsigned long reboot_offset = random(3600);
   now += reboot_offset;
-  p = ctime(&now);
+  char * p = ctime(&now);
   p += 11;
   p[5] = 0;
 
@@ -252,18 +243,42 @@ void led_loop() {
 #endif
 }
 
+static void setupWiFiConnectionOrReboot() {
+  while (millis() < 2000) {
+    delay(100);
+    if (WiFi.isConnected())
+      return;
+  };
+  // not going well - warn the user and try for a bit,
+  // while communicating a timeout with a progress bar.
+  //
+  updateDisplay_startProgressBar("Waiting for Wifi");
+  while ( millis() < WIFI_MAX_WAIT) {
+    if (WiFi.isConnected())
+      return;
+
+    updateDisplay_progressBar((float)millis() / WIFI_MAX_WAIT);
+    delay(200);
+  };
+  displayForceShowError((char *)"Wifi Problem");
+  delay(2000);
+  ESP.restart();
+}
+
 void setup()
 {
   Serial.begin(115200);
-
+  
   byte mac[6];
   WiFi.macAddress(mac);
   snprintf(terminalName,  sizeof(terminalName), "%s-%02x%02x%02x", TERMINAL_NAME, mac[3], mac[4], mac[5]);
 
-  Serial.print("Start " );
+  Serial.print("Start   : " );
   Serial.println(terminalName);
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
-
+  Serial.println("Version : " VERSION);
+  Serial.println("Compiled: " __DATE__ " " __TIME__);
+  
+  Serial.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 
 #ifdef LED_1
   setupLEDS();
@@ -280,15 +295,11 @@ void setup()
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
   WiFi.setHostname(terminalName);
 
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    displayForceShowError((char *)"Wifi Problem");
-    delay(5000);
-    ESP.restart();
-  }
+  setupWiFiConnectionOrReboot();
   Serial.printf("Joined WiFi:%s as ", WIFI_NETWORK);
   Serial.println(WiFi.localIP());
 
-  // setupOTA();
+  setupOTA();
 
   // try to get some reliable time; to stop my cert
   // checking code complaining.
@@ -298,7 +309,7 @@ void setup()
   md = WAITING_FOR_NTP;
   updateDisplay_progressText("Waiting for NTP");
   Serial.println("Starting loop");
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
+  Serial.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 }
 
 void loop()
@@ -306,7 +317,7 @@ void loop()
   static unsigned long lastchange = 0;
   static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
-  updateTimeAndRebootAtMidnight(false);
+  loop_RebootAtMidnight();
   ota_loop();
   button_loop();
 #ifdef LED_1
@@ -384,6 +395,7 @@ void loop()
   if (update) {
     update = false;
     updateDisplay();
-    updateTimeAndRebootAtMidnight(true);
-  }
+  } else {
+    updateClock(false);
+  };
 }

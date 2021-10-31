@@ -57,6 +57,9 @@
 
 #define AMOUNT_NO_OK_NEEDED (5.0)
 
+// Wait up to 10 seconds for wifi during boot.
+#define WIFI_MAX_WAIT (20*1000)
+
 #ifndef NTP_POOL
 #define NTP_POOL "nl.pool.ntp.org"
 #endif

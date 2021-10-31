@@ -147,8 +147,8 @@ void wipekeys() {
 }
 
 bool fetchCA() {
-  WiFiClientSecure * client;
-  HTTPClient * https;
+  WiFiClientSecure client;
+  HTTPClient https;
 
   const mbedtls_x509_crt *peer ;
   unsigned char sha256[256 / 8];
@@ -158,31 +158,22 @@ bool fetchCA() {
 
   updateDisplay_progressText("fetching CA");
 
-  if (!(client = new WiFiClientSecure())) {
-    Serial.println("WiFiClientSecure creation failed.");
-    goto exit;
-  }
-  if (!(https = new HTTPClient())) {
-    Serial.println("HTTPClient creation failed.");
-    goto exit;
-  }
-  Serial.printf("Heap: %d Kb\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);
-
+ 
   // Sadly required - due to a limitation in the current SSL stack we must
   // provide the root CA. but we do not know it (yet). So learn it first.
   //
-  client->setInsecure();
-  if (!https->begin(*client, PAY_URL NONE_PATH )) {
+  client.setInsecure();
+  if (!https.begin(client, PAY_URL NONE_PATH )) {
     Serial.println("Failed to begin https - fetchCA");
     goto exit;
   };
 
-  if (https->GET() < 0) {
+  if (https.GET() < 0) {
     Serial.println("Failed to begin https (GET, fetchCA)");
     goto exit;
   };
 
-  peer = client->getPeerCertificate();
+  peer = client.getPeerCertificate();
   mbedtls_sha256_ret(peer->raw.p, peer->raw.len, sha256_server, 0);
   server_cert_as_pem = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
 
@@ -200,11 +191,8 @@ bool fetchCA() {
 
   ok = true;
 exit:
-  https->end();
-  client->stop();
-
-  delete https;
-  delete client;
+  https.end();
+  client.stop();
 
   if (!ok)
     delay(5000);
@@ -212,7 +200,7 @@ exit:
 }
 
 bool registerDevice() {
-  WiFiClientSecure *client;
+  WiFiClientSecure client;
   const mbedtls_x509_crt *peer ;
   HTTPClient https;
   int httpCode;
@@ -220,20 +208,15 @@ bool registerDevice() {
   bool ok = false;
   JSONVar res;
 
-  if (!(client = new WiFiClientSecure())) {
-    Serial.println("WiFiClientSecure creation failed.");
-    goto exit;
-  }
-
-  client->setCACert(ca_root);
-  client->setCertificate(client_cert_as_pem);
-  client->setPrivateKey(client_key_as_pem);
+  client.setCACert(ca_root);
+  client.setCertificate(client_cert_as_pem);
+  client.setPrivateKey(client_key_as_pem);
 
   if (md == REGISTER) {
     snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?name=%s",
              _argencode((char *) tmp, sizeof(tmp), terminalName));
 
-    if (!https.begin(*client, (const char*)buff)) {
+    if (!https.begin(client, (const char*)buff)) {
       Serial.println("Failed to begin https");
       goto exit;
     };
@@ -243,7 +226,7 @@ bool registerDevice() {
       Serial.printf("Not gotten the 401 I expected; but %d: %s\n", httpCode, https.getString().c_str());
       goto exit;
     };
-    peer = client->getPeerCertificate();
+    peer = client.getPeerCertificate();
     mbedtls_sha256_ret(peer->raw.p, peer->raw.len, sha256, 0);
     if (memcmp(sha256, sha256_server, 32)) {
       Serial.println("Server changed mid registration. Aborting");
@@ -278,14 +261,14 @@ bool registerDevice() {
 
     snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?response=%s", (char *)tmp);
 
-    if (!https.begin(*client, (char *)buff )) {
+    if (!https.begin(client, (char *)buff )) {
       Serial.println("Failed to begin https");
       goto exit;
     };
 
     httpCode =  https.GET();
 
-    peer = client->getPeerCertificate();
+    peer = client.getPeerCertificate();
     mbedtls_sha256_ret(peer->raw.p, peer->raw.len, tmp, 0);
     if (memcmp(tmp, sha256_server, 32)) {
       Serial.println("Server changed mid registration. Aborting");
@@ -365,26 +348,26 @@ bool registerDevice() {
   Serial.println("odd - not in the price list phase yet..");
 exit:
   https.end();
-  client->stop();
-  delete client;
+  client.stop();
 
   return ok;
 };
 
 
 JSONVar rest(const char *url, int * statusCode) {
-  WiFiClientSecure *client = new WiFiClientSecure;
+  WiFiClientSecure client;
   unsigned char sha256[32];
   static JSONVar res;
   HTTPClient https;
+  String payload;
 
-  client->setCACert(ca_root);
-  client->setCertificate(client_cert_as_pem);
-  client->setPrivateKey(client_key_as_pem);
+  client.setCACert(ca_root);
+  client.setCertificate(client_cert_as_pem);
+  client.setPrivateKey(client_key_as_pem);
 
   https.setTimeout(HTTP_TIMEOUT);
 
-  if (!https.begin(*client, url)) {
+  if (!https.begin(client, url)) {
     Serial.println("setup fail");
     return 999;
   };
@@ -401,7 +384,7 @@ JSONVar rest(const char *url, int * statusCode) {
     ESP.restart();
   }
 
-  if (fingerprint_from_certpubkey( client->getPeerCertificate(), sha256)) {
+  if (fingerprint_from_certpubkey( client.getPeerCertificate(), sha256)) {
     Serial.println("Extraction of public key of server failed. Aborted.");
     httpCode = 999;
     goto exit;
@@ -413,20 +396,20 @@ JSONVar rest(const char *url, int * statusCode) {
     goto exit;
   }
 
+  payload = https.getString();
   if (httpCode == 200) {
-    String payload = https.getString();
     Serial.print("Payload: ");
     Serial.println(payload);
     res = JSON.parse(payload);
   }  else  {
     label = https.errorToString(httpCode);
     Serial.println(url);
-    Serial.println(https.getString());
+    Serial.println(payload);
     Serial.printf("REST failed: %d - %s", httpCode, https.getString());
   };
-
 exit:
   https.end();
+  client.stop();
   *statusCode = httpCode;
   return res;
 }
@@ -438,13 +421,14 @@ int payByREST(char *tag, char * amount, char *lbl) {
 
   snprintf(desc, sizeof(desc), "%s. Paid at %s", lbl, stationname);
 
-  // avoid logging the tag for privacy/security-by-obscurity reasons.
-  //
-  snprintf(buff, sizeof(buff), PAY_URL PAY_PATH "?node=%s&src=%s&amount=%s&description=%s",
-           terminalName, "XX-XX-XX-XXX", amount, _argencode(tmp, sizeof(tmp), desc));
-  Serial.print("URL : ");
-  Serial.println(buff);
-
+  if (0) {
+    // avoid logging the tag for privacy/security-by-obscurity reasons.
+    //
+    snprintf(buff, sizeof(buff), PAY_URL PAY_PATH "?node=%s&src=%s&amount=%s&description=%s",
+             terminalName, "XX-XX-XX-XXX", amount, _argencode(tmp, sizeof(tmp), desc));
+    Serial.print("URL : ");
+    Serial.println(buff);
+  };
   snprintf(buff, sizeof(buff), PAY_URL PAY_PATH "?node=%s&src=%s&amount=%s&description=%s",
            terminalName, tag, amount, _argencode(tmp, sizeof(tmp), desc));
 
