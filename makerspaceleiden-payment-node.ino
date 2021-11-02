@@ -44,9 +44,9 @@ char terminalName[64];
 #include "ota.h"
 
 
-#ifdef BOARD_V2XXXX
-Button2 btn1(BUTTON_1, INPUT, false, true /* active low */);
-Button2 btn2(BUTTON_2, INPUT, false, true /* active low */);
+#ifdef BOARD_V2
+Button2 btn1(BUTTON_1, INPUT, false, false /* active low */);
+Button2 btn2(BUTTON_2, INPUT, false, false /* active low */);
 #else
 Button2 btn1(BUTTON_1, INPUT_PULLUP);
 Button2 btn2(BUTTON_2, INPUT_PULLUP);

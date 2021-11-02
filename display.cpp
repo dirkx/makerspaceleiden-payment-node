@@ -25,6 +25,11 @@ TFT_eSPI tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
 TFT_eSprite spr = TFT_eSprite(&tft);
 
 void setupTFT() {
+#ifdef  TFT_BL
+  pinMode(TFT_BL, OUTPUT);
+  setTFTPower(false);
+#endif
+
   tft.init();
   tft.setRotation(TFT_ROTATION);
 #ifndef _H_BLUEA160x128
@@ -35,8 +40,9 @@ void setupTFT() {
 #else
   spr.createSprite(1 * tft.width(), 68);
 #endif
-}
+  setTFTPower(true);
 
+}
 
 void wifiIcon(int32_t x, int32_t  y) {
   float ss = WiFi.RSSI();
@@ -46,7 +52,7 @@ void wifiIcon(int32_t x, int32_t  y) {
   };
 
   // Range is from -80 to -10 or so. Above 60 is ok.
-  ss = 5 * (75. + ss) / 40;
+  ss = 5 * (75. + ss) / 30;
 
   tft.fillRect(x, y, 10, 6, TFT_BLACK);
   for (int s = 0; s < 5; s++) {
@@ -68,7 +74,7 @@ static void showLogo() {
 //
 static void drawPricePanel(int offset, int amount) {
   spr.setTextColor(TFT_WHITE, TFT_BLACK);
-  spr.loadFont(AA_FONT_HUGE);
+  spr.loadFont(AA_FONT_LARGE);
   spr.drawString(amounts[amount], offset + tft.width() / 2, 0);
   spr.setTextColor(TFT_YELLOW, TFT_BLACK);
 
