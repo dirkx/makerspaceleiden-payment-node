@@ -360,6 +360,7 @@ void loop()
       };
       if (default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
         last_amount = amount = default_item;
+        lastchange = millis();
         Serial.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
         update = true;
       };

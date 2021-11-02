@@ -17,8 +17,10 @@
 // #define TFT_DC              27
 // #define TFT_RST              2
 
+#ifdef BOARD_V2
 #define TFT_BL           4
 #define TFT_BACKLIGHT_ON    HIGH
+#endif
 
 #define LED_1               23 // CANCELand left red light
 #define LED_2               22 // OK and right red light
