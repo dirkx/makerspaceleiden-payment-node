@@ -358,6 +358,8 @@ void displayForceShowError(char * str) {
 }
 
 void setTFTPower(bool onoff) {
+  // only board V2 has this wire soldered.
+#ifdef BOARD_V2
   Serial.println(onoff ? "Powering display on" : "Powering display off");
 #ifdef  TFT_BL
   if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
@@ -374,5 +376,6 @@ void setTFTPower(bool onoff) {
   delay(100);
 #ifdef  TFT_BL
   if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+#endif
 #endif
 }

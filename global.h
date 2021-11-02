@@ -13,7 +13,12 @@
 //
 #define BOARD_V2
 
-#define VERSION "1.03"
+#define VERSION "1.04"
+
+/* change log:
+ * 1.03	2021/10/02 trust/pairing, screensaver, less momory
+ * 1.04 ??         no screensaver on V1 boards
+ */
 
 #ifndef TERMINAL_NAME
 #define TERMINAL_NAME "tft"
