@@ -19,6 +19,4 @@
 #define RFID_MISO     02
 #define RFID_RESET    21
 
-// #define TFT_BL        14
-
 #define TFT_ROTATION 1

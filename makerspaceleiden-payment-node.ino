@@ -43,14 +43,7 @@ char terminalName[64];
 #include "rest.h"
 #include "ota.h"
 
-
-#ifdef BOARD_V2
-Button2 btn1(BUTTON_1, INPUT, false, false /* active low */);
-Button2 btn2(BUTTON_2, INPUT, false, false /* active low */);
-#else
-Button2 btn1(BUTTON_1, INPUT_PULLUP);
-Button2 btn2(BUTTON_2, INPUT_PULLUP);
-#endif
+Button2 * btn1, * btn2;
 
 int update = false;
 
@@ -69,6 +62,7 @@ const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 // values above this amount will get an extra 'OK' question.
 
 state_t md = BOOT;
+board_t BOARD = BOARD_V1;
 
 SPIClass RFID_SPI(HSPI);
 MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &RFID_SPI);
@@ -160,7 +154,14 @@ static void loop_RebootAtMidnight() {
 
 void settupButtons()
 {
-  btn1.setPressedHandler([](Button2 & b) {
+  if (BOARD == BOARD_V2) {
+    btn1 = new Button2(BUTTON_1, INPUT_PULLUP);
+    btn2 = new Button2(BUTTON_2, INPUT_PULLUP);
+  } else {
+    btn1 = new Button2(BUTTON_1, INPUT, false, false /* active low */);
+    btn2 = new  Button2(BUTTON_2, INPUT, false, false /* active low */);
+  };
+  btn1->setPressedHandler([](Button2 & b) {
     if (md == SCREENSAVER) {
       update = true;
       return;
@@ -178,7 +179,7 @@ void settupButtons()
     // if (l != amount) Serial.println("left");
   });
 
-  btn2.setPressedHandler([](Button2 & b) {
+  btn2->setPressedHandler([](Button2 & b) {
     if (md == SCREENSAVER) {
       update = true;
       return;
@@ -200,21 +201,23 @@ void settupButtons()
 
 void button_loop()
 {
-  btn1.loop();
-  btn2.loop();
+  btn1->loop();
+  btn2->loop();
 }
 
+#ifdef LED_1
 void setupLEDS()
 {
-#ifdef LED_1
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
-  digitalWrite(LED_1, 0);
-  digitalWrite(LED_2, 0);
+  digitalWrite(LED_1, (BOARD == BOARD_V2) ? HIGH : LOW);
+  digitalWrite(LED_2, (BOARD == BOARD_V2) ? HIGH : LOW);
   delay(50);
   led_loop();
-#endif
 }
+#else
+void setupLEDS() {}
+#endif
 
 void led_loop() {
 #ifdef LED_1
@@ -226,18 +229,18 @@ void led_loop() {
       analogWrite(LED_1, NORMAL_LED_BRIGHTNESS);
       analogWrite(LED_2, NORMAL_LED_BRIGHTNESS);
 #else
-      analogWrite(LED_1, amount + 1 == NA ? NORMAL_LED_BRIGHTNESS : 0);
-      analogWrite(LED_2, amount == 0 ? NORMAL_LED_BRIGHTNESS : 0);
+      analogWrite(LED_1, amount + 1 == NA ? NORMAL_LED_BRIGHTNESS : (BOARD == BOARD_V2) ? HIGH : LOW);
+      analogWrite(LED_2, amount == 0 ? NORMAL_LED_BRIGHTNESS : (BOARD == BOARD_V2) ? HIGH : LOW);
 #endif
       break;
     case OK_OR_CANCEL:
-      digitalWrite(LED_1, 0);
-      digitalWrite(LED_2, 0);
+      digitalWrite(LED_1, (BOARD == BOARD_V2) ? HIGH : LOW);
+      digitalWrite(LED_2, (BOARD == BOARD_V2) ? HIGH : LOW);
       break;
     default:
       // Switch them off - nothing you can do here.
-      digitalWrite(LED_1, 1);
-      digitalWrite(LED_2, 1);
+      digitalWrite(LED_1, (BOARD == BOARD_V2) ? LOW : HIGH);
+      digitalWrite(LED_2, (BOARD == BOARD_V2) ? LOW : HIGH);
       break;
   };
 #endif
@@ -265,20 +268,27 @@ static void setupWiFiConnectionOrReboot() {
   ESP.restart();
 }
 
+static board_t detectBoard() {
+  pinMode(BUTTON_1, INPUT_PULLUP);
+  pinMode(BUTTON_2, INPUT_PULLUP);
+  return (digitalRead(BUTTON_1) && digitalRead(BUTTON_1))  ? BOARD_V1 : BOARD_V2;
+};
+
 void setup()
 {
   Serial.begin(115200);
-  
+
   byte mac[6];
   WiFi.macAddress(mac);
   snprintf(terminalName,  sizeof(terminalName), "%s-%s-%02x%02x%02x", TERMINAL_NAME, VERSION, mac[3], mac[4], mac[5]);
 
-  Serial.print("Start   : " );
+  BOARD = detectBoard();
+  Serial.print("Start     : " );
   Serial.println(terminalName);
   Serial.println("Version : " VERSION);
   Serial.println("Compiled: " __DATE__ " " __TIME__);
-  
-  Serial.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+  Serial.printf( "Revision: %s\n", BOARD == BOARD_V2 ? "V2 (buttons pulled high)" : "V1 (no backlight)");
+  Serial.printf( "Heap    :  %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 
 #ifdef LED_1
   setupLEDS();

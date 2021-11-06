@@ -7,17 +7,13 @@
 #include <TFT_eSPI.h>
 #include <MFRC522.h>
 
-// Board differences
-// v1 buttons pull to ground; with internal PULLUP used.
-// v2 has its buttons wired to the VCC; with pulldowns.
-//
-#define BOARD_V2
+
 
 #define VERSION "1.04"
 
 /* change log:
  * 1.03	2021/10/02 trust/pairing, screensaver, less momory
- * 1.04 ??         no screensaver on V1 boards
+ * 1.04 ??         no screensaver on V1 boards, auto detect board.
  */
 
 #ifndef TERMINAL_NAME
@@ -70,6 +66,17 @@
 #endif
 
 typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
+
+// Board differences
+// v1 buttons pull to ground; with internal PULLUP used. 
+//    No blacklight control.
+// v2 has its buttons wired to the VCC; with pulldowns.
+//    detect this board by checking that BUT1/2 are 
+//    pulled low. Backlight on pin 4.
+//
+typedef enum { BOARD_V1,  BOARD_V2 } board_t;
+extern board_t BOARD;
+
 
 // keep all ugly globals in one place for now.
 //

@@ -25,9 +25,11 @@ TFT_eSPI tft = TFT_eSPI(TFT_WIDTH, TFT_HEIGHT);
 TFT_eSprite spr = TFT_eSprite(&tft);
 
 void setupTFT() {
-#ifdef  TFT_BL
-  pinMode(TFT_BL, OUTPUT);
-  setTFTPower(false);
+#ifdef TFT_BL
+  if (BOARD == BOARD_V2) {
+    pinMode(TFT_BL, OUTPUT);
+    if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+  };
 #endif
 
   tft.init();
@@ -41,7 +43,6 @@ void setupTFT() {
   spr.createSprite(1 * tft.width(), 68);
 #endif
   setTFTPower(true);
-
 }
 
 void wifiIcon(int32_t x, int32_t  y) {
@@ -358,12 +359,18 @@ void displayForceShowError(char * str) {
 }
 
 void setTFTPower(bool onoff) {
-  // only board V2 has this wire soldered.
-#ifdef BOARD_V2
+  // only board V2 has this wire soldered. We do the BL switch on/off before/after the
+  // 100 mSecond delay - as during initial setup the memory leftover content of a previous
+  // boot/statet/etc are sometimes shown; and gives an odd flash. So we during on we
+  // first get the chip on; then power on the LED; and when we switch off; we do the
+  // reverse.
   Serial.println(onoff ? "Powering display on" : "Powering display off");
+
 #ifdef  TFT_BL
-  if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+  if (BOARD == BOARD_V2)
+    if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
+
 #ifdef ST7735_DISPON
   tft.writecommand(onoff ? ST7735_DISPON : ST7735_DISPOFF);
 #else
@@ -374,8 +381,9 @@ void setTFTPower(bool onoff) {
 #endif
 #endif
   delay(100);
+
 #ifdef  TFT_BL
-  if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
-#endif
+  if (BOARD == BOARD_V2)
+    if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 }
