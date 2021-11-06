@@ -14,8 +14,8 @@
 #include "NotoSansMedium20.h"
 #define AA_FONT_LARGE NotoSanMedium20
 
-#include "NotoSansBold36.h"
-#define AA_FONT_HUGE  NotoSansBold36
+// #include "NotoSansBold36.h"
+// #define AA_FONT_HUGE  NotoSansBold36
 
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
@@ -158,9 +158,9 @@ void updateDisplay()
   switch (md) {
     case BOOT:
       showLogo();
-      tft.loadFont(AA_FONT_HUGE);
+      tft.loadFont(AA_FONT_LARGE);
       tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("paynode", tft.width() / 2, tft.height() / 2 - 10);
+      tft.drawString("MSL Payments", tft.width() / 2, tft.height() / 2 - 10);
 
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
