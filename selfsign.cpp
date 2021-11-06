@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "geneckey.h"
+#include "log.h"
 
 #define MBEDTLS_EXIT_SUCCESS    EXIT_SUCCESS
 #define MBEDTLS_EXIT_FAILURE    EXIT_FAILURE
@@ -57,7 +58,7 @@ int pem2der(unsigned char * buff) {
   };
 
   if (mbedtls_base64_decode(buff, len, &len, (const unsigned char*) p, e - p)) {
-    Serial.println("Invalid PEM to DER");
+    Log.println("Invalid PEM to DER");
     return -1;
   };
   return len;
@@ -74,7 +75,7 @@ const char * der2pem(const char *what, unsigned char * der, size_t derlen) {
   p += snprintf((char *)p, ep - p, "-----BEGIN %s-----\n", what);
 
   if (mbedtls_base64_encode (pem, len, &len, der, derlen) < 0) {
-    Serial.println("Failed to encode");
+    Log.println("Failed to encode");
     free(pem); free(tmp);
     return NULL;
   }
@@ -234,7 +235,7 @@ int fingerprint_from_pem(char * buff, unsigned char sha256[256 / 8]) {
   if (((ret = pem2der(p)) < 0 ) ||
       ((ret = mbedtls_sha256_ret(p, ret, sha256, 0)) < 0 ))
   {
-    Serial.printf("fingerprint_from_pem failed: %02X\n", -ret);
+    Log.printf("fingerprint_from_pem failed: %02X\n", -ret);
     memset(sha256, 0, 32);
   };
   free(p);
@@ -251,7 +252,7 @@ int fingerprint_from_certpubkey(const mbedtls_x509_crt * crt, unsigned char sha2
       ((ret = pem2der(buff)) < 0 ) ||
       ((ret = mbedtls_sha256_ret(buff, ret, sha256, 0)) < 0 ))
   {
-    Serial.printf("fingerprint_from_certpubkey failed: %02X\n", -ret);
+    Log.printf("fingerprint_from_certpubkey failed: %02X\n", -ret);
     memset(sha256, 0, 32);
   };
   return ret;
@@ -267,22 +268,22 @@ void dump_der_as_pem(const char *what, unsigned char * der, size_t derlen) {
 
   unsigned char * tmp = NULL;
   size_t len = 0;
-  Serial.printf("-----BEGIN %s-----\n", what);
+  Log.printf("-----BEGIN %s-----\n", what);
 
   mbedtls_base64_encode (NULL, 0, &len, der, derlen);
   tmp = (unsigned char *) malloc(len);
 
   if (mbedtls_base64_encode (tmp, len, &len, der, derlen) < 0) {
-    Serial.println("Failed to encode");
+    Log.println("Failed to encode");
     return;
   }
 
   for (int i = 0 ; i < len; i++) {
-    Serial.print((char)tmp[i]);
+    Log.print((char)tmp[i]);
     if ((i == len - 1) || (i % 64 == 63))
-      Serial.println();
+      Log.println();
   };
-  Serial.printf("-----END %s-----\n", what);
+  Log.printf("-----END %s-----\n", what);
   free(tmp);
 }
 int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsigned char ** out_cert_as_der, size_t * outcertlenp, unsigned char ** out_key_as_der, size_t * outkeylenp)
@@ -300,7 +301,7 @@ int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsig
 
   // some padding routine deep inside mbed tls insist on this.
   if (!(der = (unsigned char*) heap_caps_malloc(DEFAULT_DER_MAX, MALLOC_CAP_32BIT))) {
-    Serial.println("Failed to allocate memory");
+    Log.println("Failed to allocate memory");
     goto exit;
   }
   der = (unsigned char *) malloc( 8 * 1024);
@@ -316,7 +317,7 @@ int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsig
 
   dump_der_as_pem("EC PRIVATE KEY", *out_key_as_der, outkeylen);
   MBOK(mbedtls_pk_write_key_pem(key, der, 8 * 1024));
-  Serial.println((char*)der);
+  Log.println((char*)der);
 
 
   MBOK(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func,
@@ -332,10 +333,10 @@ int sign_and_toder(mbedtls_pk_context * key, mbedtls_x509write_cert * crt, unsig
   }
   memcpy(*out_cert_as_der, der, outcertlen);
 
-  Serial.println("completion");
+  Log.println("completion");
 
   MBOK(mbedtls_x509write_crt_pem(crt, der, DEFAULT_DER_MAX, mbedtls_ctr_drbg_random, &ctr_drbg));
-  Serial.println((char*)der);
+  Log.println((char*)der);
 
   dump_der_as_pem("CERTIFICATE", *out_cert_as_der, outcertlen);
 

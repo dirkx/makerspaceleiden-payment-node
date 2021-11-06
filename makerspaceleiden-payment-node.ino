@@ -37,11 +37,30 @@ char terminalName[64];
 #include <Button2.h>
 #include <analogWrite.h>
 
+#include "TelnetSerialStream.h"
 #include "global.h"
 #include "selfsign.h"
 #include "display.h"
 #include "rest.h"
 #include "ota.h"
+#include "rfid.h"
+
+TelnetSerialStream telnetSerialStream = TelnetSerialStream();
+
+#ifdef SYSLOG_HOST
+#include "SyslogStream.h"
+SyslogStream syslogStream = SyslogStream();
+#endif
+
+#ifdef MQTT_HOST
+#include "MqttlogStream.h"
+// EthernetClient client;
+WiFiClient client;
+MqttStream mqttStream = MqttStream(&client, MQTT_HOST);
+char topic[128] = "log/" TERMINAL_NAME;
+#endif
+
+TLog Log, Debug;
 
 Button2 * btn1, * btn2;
 
@@ -55,6 +74,8 @@ int amount = 0;
 int default_item = -1;
 double amount_no_ok_needed = AMOUNT_NO_OK_NEEDED;
 const char * version = VERSION;
+double paid = 0;
+String label = "unset";
 
 // Hardcode for Europe (ESP32/Espresifs defaults for CEST seem wrong)./
 const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
@@ -63,58 +84,6 @@ const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 
 state_t md = BOOT;
 board_t BOARD = BOARD_V1;
-
-SPIClass RFID_SPI(HSPI);
-MFRC522_SPI spiDevice = MFRC522_SPI(RFID_CS, RFID_RESET, &RFID_SPI);
-MFRC522 mfrc522 = MFRC522(&spiDevice);
-
-// Very ugly global vars - used to communicate between the REST call and the rest.
-//
-char tag[128] = { 0 };
-String label = "unset";
-
-void setupRFID()
-{
-  RFID_SPI.begin(RFID_SCLK, RFID_MISO, RFID_MOSI, RFID_CS);
-  mfrc522.PCD_Init();
-  Serial.print("RFID Scanner: ");
-  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
-}
-
-bool loopRFID() {
-  if (md != WAIT_FOR_REGISTER_SWIPE && md != ENTER_AMOUNT)
-    return false;
-
-  if ( ! mfrc522.PICC_IsNewCardPresent()) {
-    return false;
-  }
-
-  if ( ! mfrc522.PICC_ReadCardSerial()) {
-    Serial.println("Bad read (was card removed too quickly ? )");
-    return false;
-  }
-  if (mfrc522.uid.size == 0) {
-    Serial.println("Bad card (size = 0)");
-    return false;
-  };
-
-  // We're somewhat strict on the parsing/what we accept; as we use it unadultared in the URL.
-  if (mfrc522.uid.size > sizeof(mfrc522.uid.uidByte)) {
-    Serial.println("Too large a card id size. Ignoring.)");
-    return false;
-  };
-
-  memset(tag, 0, sizeof(tag));
-  for (int i = 0; i < mfrc522.uid.size; i++) {
-    char buff[5]; // 3 digits, dash and \0.
-    snprintf(buff, sizeof(buff), "%s%d", i ? "-" : "", mfrc522.uid.uidByte[i]);
-    strncat(tag, buff, sizeof(tag) - 1);
-  };
-
-  Serial.println("Good scan");
-  mfrc522.PICC_HaltA();
-  return true;
-}
 
 
 // Updates the small clock in the top right corner; and
@@ -132,7 +101,7 @@ static void loop_RebootAtMidnight() {
     time_t now = time(nullptr);
     char * p = ctime(&now);
     p[5 + 11 + 3] = 0;
-    Serial.printf("%s Heap: %d Kb\n", p, (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+    Log.printf("%s Heap: %d Kb\n", p, (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
   }
   time_t now = time(nullptr);
   if (now < 3600)
@@ -146,7 +115,7 @@ static void loop_RebootAtMidnight() {
   p[5] = 0;
 
   if (strncmp(p, AUTO_REBOOT_TIME, strlen(AUTO_REBOOT_TIME)) == 0 && millis() > 3600UL) {
-    Serial.println("Nightly reboot - also to fetch new pricelist and fix any memory eaks.");
+    Log.println("Nightly reboot - also to fetch new pricelist and fix any memory eaks.");
     ESP.restart();
   }
 #endif
@@ -176,7 +145,7 @@ void settupButtons()
       md = DID_OK;
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
-    // if (l != amount) Serial.println("left");
+    // if (l != amount) Log.println("left");
   });
 
   btn2->setPressedHandler([](Button2 & b) {
@@ -195,7 +164,7 @@ void settupButtons()
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
 
-    //    if (l != amount) Serial.println("right");
+    //    if (l != amount) Log.println("right");
   });
 }
 
@@ -274,8 +243,12 @@ static board_t detectBoard() {
   return (digitalRead(BUTTON_1) && digitalRead(BUTTON_1))  ? BOARD_V1 : BOARD_V2;
 };
 
+bool isPaired = false;
 void setup()
 {
+  char * p =  __FILE__;
+  if (rindex(p, '/')) p = rindex(p, '/') + 1;
+
   Serial.begin(115200);
 
   byte mac[6];
@@ -283,12 +256,15 @@ void setup()
   snprintf(terminalName,  sizeof(terminalName), "%s-%s-%02x%02x%02x", TERMINAL_NAME, VERSION, mac[3], mac[4], mac[5]);
 
   BOARD = detectBoard();
+  Serial.printf( "File:     %s\n", p);
   Serial.print("Start     : " );
   Serial.println(terminalName);
   Serial.println("Version : " VERSION);
   Serial.println("Compiled: " __DATE__ " " __TIME__);
   Serial.printf( "Revision: %s\n", BOARD == BOARD_V2 ? "V2 (buttons pulled high)" : "V1 (no backlight)");
   Serial.printf( "Heap    :  %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+  Serial.print(  "MacAddr:  ");
+  Serial.println(WiFi.macAddress());
 
 #ifdef LED_1
   setupLEDS();
@@ -299,15 +275,43 @@ void setup()
 
   setupRFID();
   settupButtons();
-  setupAuth(terminalName);
+  isPaired = setupAuth(terminalName);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_NETWORK, WIFI_PASSWD);
   WiFi.setHostname(terminalName);
 
   setupWiFiConnectionOrReboot();
-  Serial.printf("Joined WiFi:%s as ", WIFI_NETWORK);
-  Serial.println(WiFi.localIP());
+
+  Log.addPrintStream(std::make_shared<TelnetSerialStream>(telnetSerialStream));
+  Debug.addPrintStream(std::make_shared<TelnetSerialStream>(telnetSerialStream));
+
+#ifdef SYSLOG_HOST
+  syslogStream.setDestination(SYSLOG_HOST);
+  syslogStream.setRaw(false); // wether or not the syslog server is a modern(ish) unix.
+#ifdef SYSLOG_PORT
+  syslogStream.setPort(SYSLOG_PORT);
+#endif
+  Log.addPrintStream(std::make_shared<SyslogStream>(syslogStream));
+#endif
+
+#ifdef MQTT_HOST
+#ifdef MQTT_TOPIC_PREFIX
+  snprintf(topic, sizeof(topic), "%s/log/%s", MQTT_TOPIC_PREFIX, terminalName);
+  mqttStream.setTopic(topic);
+#endif
+  Log.addPrintStream(std::make_shared<MqttStream>(mqttStream));
+#endif
+
+  Log.printf( "File:     %s\n", p);
+  Log.println("Firmware: " TERMINAL_NAME "-" VERSION);
+  Log.println("Build:    " __DATE__ " " __TIME__ );
+  Log.print(  "Unit:     ");
+  Log.println(terminalName);
+  Log.print(  "MacAddr:  ");
+  Log.println(WiFi.macAddress());
+  Log.print(  "IP:     ");
+  Log.println(WiFi.localIP());
 
   setupOTA();
 
@@ -318,8 +322,8 @@ void setup()
 
   md = WAITING_FOR_NTP;
   updateDisplay_progressText("Waiting for NTP");
-  Serial.println("Starting loop");
-  Serial.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+  Log.println("Starting loop");
+  Log.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 }
 
 void loop()
@@ -327,12 +331,23 @@ void loop()
   static unsigned long lastchange = 0;
   static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
+  Log.loop();
+  Debug.loop();
   loop_RebootAtMidnight();
   ota_loop();
   button_loop();
 #ifdef LED_1
   led_loop();
 #endif
+  {
+    static unsigned  long last_report = millis();
+    if (millis() - last_report > REPORT_INTERVAL) {
+      Log.printf("%s {\"rfid_scans\":%u,\"rfid_misses\":%u,\"ota\":true,\"state\":3,\"IP_address\":\"%s\",\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\",\"Firmware\":\"%s\"}\n", stationname,
+                 rfid_scans, rfid_miss, String(WiFi.localIP()).c_str(), String(WiFi.macAddress()).c_str(), paid, VERSION, terminalName);
+
+      last_report = millis();
+    }
+  }
 
   switch (md) {
     case WAITING_FOR_NTP:
@@ -341,22 +356,31 @@ void loop()
       return;
       break;
     case FETCH_CA:
-      fetchCA();
+      if (fetchCA())
+        md = isPaired ? REGISTER_PRICELIST : REGISTER;
       return;
     case REGISTER:
-      registerDevice();
+      if (registerDevice())
+        md = WAIT_FOR_REGISTER_SWIPE;
       return;
     case WAIT_FOR_REGISTER_SWIPE:
       if (loopRFID())
-        registerDevice();
+        if (registerDeviceWithSwipe(tag)) {
+          isPaired = true;
+          md = REGISTER_PRICELIST;
+        };
       return;
     case REGISTER_PRICELIST:
-      if (fetchPricelist())
+    { int httpCode = fetchPricelist();
+      if (httpCode = 200)
         md = ENTER_AMOUNT;
+      else if (httpCode = 400) 
+        md = REGISTER; // something gone very wrong server side - simply reset/retry.
       return;
+    };
     case SCREENSAVER:
       if (update) {
-        Serial.println("Wakeup");
+        Log.println("Wakeup");
         setTFTPower(true);
         md = ENTER_AMOUNT;
       };
@@ -364,14 +388,14 @@ void loop()
     case ENTER_AMOUNT:
       if (millis() - lastchange > SCREENSAVER_TIMEOUT) {
         md = SCREENSAVER;
-        Serial.println("Enabling screensaver (from enter)");
+        Log.println("Enabling screensaver (from enter)");
         setTFTPower(false);
         return;
       };
       if (default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
         last_amount = amount = default_item;
         lastchange = millis();
-        Serial.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
+        Log.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
         update = true;
       };
       if (NA > 0) {
@@ -380,6 +404,9 @@ void loop()
           update = true;
         };
       };
+    case PAID:
+      paid += atof(prices[amount]);
+      break;
     default:
       break;
   };

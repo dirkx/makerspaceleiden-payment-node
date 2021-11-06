@@ -12,6 +12,7 @@
 #include <mbedtls/ctr_drbg.h>
 
 #include "geneckey.h"
+#include "log.h"
 
 // We cannot use CURVE2551 in the older version of Espressif -- as mbedtls does not know its OID.
 //
@@ -36,24 +37,24 @@ int geneckey(mbedtls_pk_context *key)
   if ( ( ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy_ctx,
                                       (const unsigned char*)seed, strlen(seed))) != 0 ) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    Serial.print("mbedtls_ctr_drbg_seed: ");
-    Serial.println(buff);
+    Log.print("mbedtls_ctr_drbg_seed: ");
+    Log.println(buff);
     return ret;
   };
   mbedtls_pk_init(key);
   if ( ( ret = mbedtls_pk_setup(key,
                                 mbedtls_pk_info_from_type( MBEDTLS_PK_ECKEY ) ) ) != 0 ) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    Serial.print("mbedtls_pk_setup: ");
-    Serial.println(buff);
+    Log.print("mbedtls_pk_setup: ");
+    Log.println(buff);
     goto exit;
   }
 
   if ((ret = mbedtls_ecp_gen_key(DFL_EC_CURVE, mbedtls_pk_ec(*key),
                                  mbedtls_ctr_drbg_random, &ctr_drbg )) != 0) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    Serial.print("mbedtls_ecp_gen_key: ");
-    Serial.println(buff);
+    Log.print("mbedtls_ecp_gen_key: ");
+    Log.println(buff);
     goto exit;
   }
 
@@ -61,11 +62,11 @@ int geneckey(mbedtls_pk_context *key)
   tmp = (unsigned char *) malloc( 8 * 1024);
   if (tmp == NULL || (ret = mbedtls_pk_write_key_pem(key, tmp, 8 * 1024)) != 0) {
     mbedtls_strerror(ret, buff, sizeof(buff));
-    Serial.print("mbedtls_pk_write_key_pem: ");
-    Serial.println(buff);
+    Log.print("mbedtls_pk_write_key_pem: ");
+    Log.println(buff);
     goto exit;
   };
-  Serial.printf("%s\n", tmp);
+  Log.printf("%s\n", tmp);
   free(tmp);
 #endif
 

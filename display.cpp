@@ -1,6 +1,8 @@
 #include "global.h"
 #include "display.h"
+#include "rfid.h"
 #include "rest.h"
+#include "log.h"
 
 #include "NotoSansMedium8.h"
 #define AA_FONT_TINY  NotoSansMedium8
@@ -28,7 +30,7 @@ void setupTFT() {
 #ifdef TFT_BL
   if (BOARD == BOARD_V2) {
     pinMode(TFT_BL, OUTPUT);
-    if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+    digitalWrite(TFT_BL, (!TFT_BACKLIGHT_ON));
   };
 #endif
 
@@ -332,7 +334,7 @@ void updateClock(bool force) {
 };
 
 void updateDisplay_progressText(char * str) {
-  Serial.println(str);
+  Log.println(str);
   updateDisplay();
   tft.setTextDatum(MC_DATUM);
   tft.loadFont(AA_FONT_MEDIUM);
@@ -340,7 +342,7 @@ void updateDisplay_progressText(char * str) {
 }
 
 void updateDisplay_warningText(char * str) {
-  Serial.println(str);
+  Log.println(str);
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   showLogo();
@@ -364,11 +366,13 @@ void setTFTPower(bool onoff) {
   // boot/statet/etc are sometimes shown; and gives an odd flash. So we during on we
   // first get the chip on; then power on the LED; and when we switch off; we do the
   // reverse.
-  Serial.println(onoff ? "Powering display on" : "Powering display off");
+  Log.println(onoff ? "Powering display on" : "Powering display off");
 
 #ifdef  TFT_BL
-  if (BOARD == BOARD_V2)
-    if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+  if (BOARD == BOARD_V1)
+    return;
+
+  if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 
 #ifdef ST7735_DISPON
@@ -383,7 +387,6 @@ void setTFTPower(bool onoff) {
   delay(100);
 
 #ifdef  TFT_BL
-  if (BOARD == BOARD_V2)
-    if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
+  if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 }

@@ -13,7 +13,9 @@
 
 /* change log:
  * 1.03	2021/10/02 trust/pairing, screensaver, less momory
- * 1.04 ??         no screensaver on V1 boards, auto detect board.
+ * 1.04 ??         no screensaver on V1 boards, auto detect 
+ *                 board, logging (telnet, syslog, mqtt), falish
+ *                 reporting much like the ACL nodes.
  */
 
 #ifndef TERMINAL_NAME
@@ -58,6 +60,8 @@
 
 #define AMOUNT_NO_OK_NEEDED (5.0)
 
+#define REPORT_INTERVAL (10*60*1000)
+
 // Wait up to 10 seconds for wifi during boot.
 #define WIFI_MAX_WAIT (20*1000)
 
@@ -90,7 +94,6 @@ extern int default_item ;
 extern state_t md;
 extern const char * version;
 extern char terminalName[64];
-extern char tag[128];
 extern String label;
 void led_loop();
 
