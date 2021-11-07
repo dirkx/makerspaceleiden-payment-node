@@ -22,9 +22,8 @@ void setupOTA() {
 
   ArduinoOTA
   .onStart([]() {
-    md = FIRMWARE_UPDATE;
-    led_loop();
-    updateDisplay();
+    led_loop(FIRMWARE_UPDATE);
+    updateDisplay(FIRMWARE_UPDATE);
   })
   .onEnd([]() {
     // wipe the keys - to prevent some cleversod from uploading something to
@@ -44,7 +43,6 @@ void setupOTA() {
     else label = "Uknown error";
     displayForceShowError((char*)label.c_str());
     delay(5000);
-    md = OEPSIE;
   });
   ArduinoOTA.begin();
 };

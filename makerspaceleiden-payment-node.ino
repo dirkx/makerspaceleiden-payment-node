@@ -182,13 +182,13 @@ void setupLEDS()
   digitalWrite(LED_1, (BOARD == BOARD_V2) ? HIGH : LOW);
   digitalWrite(LED_2, (BOARD == BOARD_V2) ? HIGH : LOW);
   delay(50);
-  led_loop();
+  led_loop(md);
 }
 #else
 void setupLEDS() {}
 #endif
 
-void led_loop() {
+void led_loop(state_t md) {
 #ifdef LED_1
   switch (md) {
     case ENTER_AMOUNT:
@@ -271,7 +271,7 @@ void setup()
 #endif
   setupTFT();
   md = BOOT;
-  updateDisplay();
+  updateDisplay(BOOT);
 
   setupRFID();
   settupButtons();
@@ -331,13 +331,14 @@ void loop()
   static unsigned long lastchange = 0;
   static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
+  unsigned int extra_show_delay = 0;
   Log.loop();
   Debug.loop();
   loop_RebootAtMidnight();
   ota_loop();
   button_loop();
 #ifdef LED_1
-  led_loop();
+  led_loop(md);
 #endif
   {
     static unsigned  long last_report = millis();
@@ -371,13 +372,13 @@ void loop()
         };
       return;
     case REGISTER_PRICELIST:
-    { int httpCode = fetchPricelist();
-      if (httpCode = 200)
-        md = ENTER_AMOUNT;
-      else if (httpCode = 400) 
-        md = REGISTER; // something gone very wrong server side - simply reset/retry.
-      return;
-    };
+      { int httpCode = fetchPricelist();
+        if (httpCode = 200)
+          md = ENTER_AMOUNT;
+        else if (httpCode = 400)
+          md = REGISTER; // something gone very wrong server side - simply reset/retry.
+        return;
+      };
     case SCREENSAVER:
       if (update) {
         Log.println("Wakeup");
@@ -398,14 +399,35 @@ void loop()
         Log.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
         update = true;
       };
+      memset(tag, 0, sizeof(tag));
       if (NA > 0) {
         if (loopRFID()) {
           md = (atof(prices[amount]) < AMOUNT_NO_OK_NEEDED) ?  DID_OK : OK_OR_CANCEL;
           update = true;
         };
       };
+      break;
+    case DID_CANCEL:
+      extra_show_delay = 1500;
+      md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
+      break;
+    case DID_OK:
+      md = (payByREST(tag, prices[amount], descs[amount]) == 200) ? PAID : OEPSIE;
+      memset(tag, 0, sizeof(tag));
+      break;
     case PAID:
+      extra_show_delay = 1500;
+      md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
+      label = "";
       paid += atof(prices[amount]);
+      break;
+    case OEPSIE:
+      extra_show_delay = 2500;
+      md = ENTER_AMOUNT;
+      memset(tag, 0, sizeof(tag));
+      label = "";
       break;
     default:
       break;
@@ -432,8 +454,9 @@ void loop()
 
   if (update) {
     update = false;
-    updateDisplay();
+    updateDisplay(md);
   } else {
     updateClock(false);
   };
+  delay(extra_show_delay);
 }

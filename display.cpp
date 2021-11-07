@@ -152,7 +152,7 @@ void updateDisplay_progressBar(float p)
   lastw = w;
 };
 
-void updateDisplay()
+void updateDisplay(state_t md)
 {
   tft.fillScreen(TFT_BLACK);
   updateClock(true);
@@ -227,7 +227,6 @@ void updateDisplay()
       } else {
         tft.drawString("- no articles -", tft.width() / 2, 20);
       }
-      memset(tag, 0, sizeof(tag));
       break;
     case OK_OR_CANCEL:
       tft.loadFont(AA_FONT_SMALL);
@@ -248,16 +247,11 @@ void updateDisplay()
       tft.setTextColor(TFT_RED, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("aborted", tft.width() / 2, tft.height() / 2 - 52);
-      delay(1000);
-      md = ENTER_AMOUNT;
-      memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
-      md = (payByREST(tag, prices[amount], descs[amount]) == 200) ? PAID : OEPSIE;
-      memset(tag, 0, sizeof(tag));
       break;
     case PAID:
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -265,10 +259,6 @@ void updateDisplay()
       tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
-      delay(1500);
-      md = ENTER_AMOUNT;
-      memset(tag, 0, sizeof(tag));
-      label = "";
       break;
     case OEPSIE:
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -277,10 +267,6 @@ void updateDisplay()
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString(label, tft.width() / 2, tft.height() / 2 + 2);
       tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
-      delay(2500);
-      md = ENTER_AMOUNT;
-      memset(tag, 0, sizeof(tag));
-      label = "";
       break;
     case FIRMWARE_UPDATE:
       updateDisplay_startProgressBar("firmware update");
@@ -300,7 +286,6 @@ void updateDisplay()
 void updateClock(bool force) {
   static time_t last_now = 0;
   time_t now = time(nullptr);
-  char str[32] = { ' ', ' ' };
 
   if (!force) {
     // only show the lock post NTP sync.
@@ -316,28 +301,32 @@ void updateClock(bool force) {
   p += 11;
   p[5] = 0; // or use 8 to also show seconds.
 
-  // we keep a space in front; to wipe any (longer) strings). As
-  // the font is not monospaced.
-  //
-  strcpy(str + 2, p);
-
   tft.setTextDatum(TR_DATUM);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.loadFont(AA_FONT_TINY);
-  tft.drawString(str, tft.width(), 0);
+  int padding = tft.textWidth(p, -1); 
+  tft.setTextPadding(padding);
+
+  tft.drawString(p, tft.width(), 0);
 
   wifiIcon(0, 0);
   return;
   tft.setTextDatum(TL_DATUM);
+  char str[128];
   snprintf(str, sizeof(str), "%d Kb %d dBm", (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL, (int)WiFi.RSSI());
   tft.drawString(str, 0, 0);
 };
 
 void updateDisplay_progressText(char * str) {
   Log.println(str);
-  updateDisplay();
+  // updateDisplay();
   tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
   tft.loadFont(AA_FONT_MEDIUM);
+  int padding = tft.textWidth(str, -1);
+  tft.setTextPadding(padding);
+
   tft.drawString(str, tft.width() / 2,  tft.height() - 20);
 }
 
@@ -352,12 +341,9 @@ void updateDisplay_warningText(char * str) {
 }
 
 void displayForceShowError(char * str) {
-  state_t prev = md;
   label = String(str);
-  md = OEPSIE;
-  updateDisplay();
+  updateDisplay(OEPSIE);
   delay(1000);
-  md = prev;
 }
 
 void setTFTPower(bool onoff) {

@@ -229,7 +229,6 @@ bool registerDevice() {
 
   nonce = strdup((https.getString().c_str()));
   Log.println("Got a NONCE - waiting for tag swipe");
-  updateDisplay();
   ok = true;
 
 exit:

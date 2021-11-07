@@ -91,10 +91,9 @@ extern char **descs;
 extern int amount;
 extern double amount_no_ok_needed;
 extern int default_item ;
-extern state_t md;
 extern const char * version;
 extern char terminalName[64];
 extern String label;
-void led_loop();
+void led_loop(state_t md);
 
 #endif

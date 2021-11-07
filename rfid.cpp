@@ -24,9 +24,6 @@ void setupRFID()
 }
 
 bool loopRFID() {
-  if (md != WAIT_FOR_REGISTER_SWIPE && md != ENTER_AMOUNT)
-    return false;
-
   if ( ! mfrc522.PICC_IsNewCardPresent()) {
     return false;
   }
