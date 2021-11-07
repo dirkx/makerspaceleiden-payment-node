@@ -204,20 +204,6 @@ void updateDisplay(state_t md)
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.drawString("swipe admin tag", tft.width() / 2, tft.height() / 2 + 20);
       break;
-    case REGISTER_FAIL:
-      showLogo();
-      tft.loadFont(AA_FONT_LARGE);
-      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-      tft.drawString("registration failed", tft.width() / 2, tft.height() / 2 + 10);
-      tft.drawString("powering down", tft.width() / 2, tft.height() / 2 - 20);
-      for (int i = 100; i; i--) {
-        char buff[32]; snprintf(buff, sizeof(buff), "   % d   ", i);
-        tft.drawString(buff, tft.width() / 2, tft.height() / 2 - 30);
-        delay(1000);
-      };
-      tft.fillScreen(TFT_BLACK);
-      esp_deep_sleep_start();
-      break;
     case ENTER_AMOUNT:
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
@@ -260,14 +246,6 @@ void updateDisplay(state_t md)
       break;
     case FIRMWARE_UPDATE:
       updateDisplay_startProgressBar("firmware update");
-      break;
-    case FIRMWARE_FAIL:
-      tft.fillScreen(TFT_RED);
-      tft.setTextColor(TFT_WHITE, TFT_RED);
-      tft.setTextDatum(MC_DATUM);
-      tft.loadFont(AA_FONT_MEDIUM);
-      tft.drawString("update aborted", tft.width() / 2,  40);
-      tft.loadFont(AA_FONT_LARGE);
       break;
   }
 }

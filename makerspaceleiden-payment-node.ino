@@ -342,8 +342,15 @@ void loop()
   {
     static unsigned  long last_report = millis();
     if (millis() - last_report > REPORT_INTERVAL) {
-      Log.printf("%s {\"rfid_scans\":%u,\"rfid_misses\":%u,\"ota\":true,\"state\":3,\"IP_address\":\"%s\",\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\",\"Firmware\":\"%s\"}\n", stationname,
-                 rfid_scans, rfid_miss, String(WiFi.localIP()).c_str(), String(WiFi.macAddress()).c_str(), paid, VERSION, terminalName);
+      Log.printf("%s {\"rfid_scans\":%u,\"rfid_misses\":%u,"\
+                 "\"ota\":true,\"state\":3,\"IP_address\":\"%s\","\
+                 "\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
+                 "\"Firmware\":\"%s\",\"heap\":%u}\n",
+                 stationname, rfid_scans, rfid_miss, 
+                 String(WiFi.localIP()).c_str(), 
+                 String(WiFi.macAddress()).c_str(), paid,
+                 VERSION, terminalName,  
+                 (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 
       last_report = millis();
     }
@@ -407,7 +414,7 @@ void loop()
       };
       break;
     case DID_CANCEL:
-      extra_show_delay = 1500;
+      displayForceShowErrorModal("Cancelled");
       md = ENTER_AMOUNT;
       memset(tag, 0, sizeof(tag));
       break;
@@ -416,14 +423,12 @@ void loop()
         displayForceShowErrorModal("Payment failed");
         md = ENTER_AMOUNT;
       } else {
-        md = PAID;
+        displayForceShowErrorModal("Paid");
         extra_show_delay = 1500;
+        md = ENTER_AMOUNT;
+        paid += atof(prices[amount]);
       };
       memset(tag, 0, sizeof(tag));
-      break;
-    case PAID:
-      md = ENTER_AMOUNT;
-      paid += atof(prices[amount]);
       break;
   };
 
