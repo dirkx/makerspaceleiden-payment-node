@@ -119,13 +119,13 @@ bool setupAuth(const char * terminalName) {
     if (0 != populate_self_signed(&key, terminalName, &crt)) {
       Log.println("Generation error. Aborting");
       keystore.end();
-      return OEPSIE;
+      return false;
     }
 
     if (0 != sign_and_topem(&key, &crt, &client_cert_as_pem, &client_key_as_pem)) {
       Log.println("Derring error. Aborting");
       keystore.end();
-      return OEPSIE;
+      return false;
     };
   } else {
     Log.printf("Using existing keys (keystore version 0x%03x), fully configured\n", version);
@@ -382,7 +382,7 @@ JSONVar rest(const char *url, int * statusCode) {
 
   if (httpCode < 0) {
     Log.println("Rebooting, wifi issue" );
-    displayForceShowError("NET FAIL");
+    displayForceShowErrorModal("NET FAIL");
     delay(1000);
     ESP.restart();
   }
@@ -405,7 +405,6 @@ JSONVar rest(const char *url, int * statusCode) {
     Log.println(payload);
     res = JSON.parse(payload);
   }  else  {
-    label = https.errorToString(httpCode);
     Log.println(url);
     Log.println(payload);
     Log.printf("REST failed: %d - %s", httpCode, https.getString());
@@ -440,7 +439,7 @@ int payByREST(char *tag, char * amount, char *lbl) {
 
   if (httpCode == 200) {
     bool ok = false;
-    label = String((const char*) res["user"]);
+    // label = String((const char*) res["user"]);
 
     if (res.hasOwnProperty("result"))
       ok = (bool) res["result"];

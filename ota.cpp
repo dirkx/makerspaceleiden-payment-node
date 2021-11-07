@@ -35,14 +35,15 @@ void setupOTA() {
     updateDisplay_progressBar(1.0 * progress / total);
   })
   .onError([](ota_error_t error) {
-    if (error == OTA_AUTH_ERROR) label = "Auth Failed";
-    else if (error == OTA_BEGIN_ERROR) label = "Begin Failed";
-    else if (error == OTA_CONNECT_ERROR) label = "Connect Failed";
-    else if (error == OTA_RECEIVE_ERROR) label = "Receive Failed";
-    else if (error == OTA_END_ERROR) label = "End Failed";
-    else label = "Uknown error";
-    displayForceShowError((char*)label.c_str());
-    delay(5000);
+    const char * str;
+    if (error == OTA_AUTH_ERROR) str = "Auth Failed";
+    else if (error == OTA_BEGIN_ERROR) str = "Begin Failed";
+    else if (error == OTA_CONNECT_ERROR) str = "Connect Failed";
+    else if (error == OTA_RECEIVE_ERROR) str = "Receive Failed";
+    else if (error == OTA_END_ERROR) str = "End Failed";
+    else str = "Uknown error";
+    displayForceShowErrorModal(str);
+    delay(2500);
   });
   ArduinoOTA.begin();
 };

@@ -9,12 +9,12 @@ void setupTFT();
 
 void updateDisplay(state_t md);
 
-void updateDisplay_startProgressBar(char *str);
+void updateDisplay_startProgressBar(const char *str);
 void updateDisplay_progressBar(float p);
 
-void updateDisplay_progressText(char * str);
-void displayForceShowError(char * str);
-void updateDisplay_warningText(char * str);
+void updateDisplay_progressText(const char * str);
+void displayForceShowErrorModal(const char * str);
+void updateDisplay_warningText(const char * str);
 
 void updateClock(bool force);
 

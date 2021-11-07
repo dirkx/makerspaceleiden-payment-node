@@ -69,7 +69,7 @@
 #define NTP_POOL "nl.pool.ntp.org"
 #endif
 
-typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL, OEPSIE } state_t;
+typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, PAID, SCREENSAVER, FIRMWARE_UPDATE, FIRMWARE_FAIL, REGISTER_FAIL } state_t;
 
 // Board differences
 // v1 buttons pull to ground; with internal PULLUP used. 
@@ -93,7 +93,6 @@ extern double amount_no_ok_needed;
 extern int default_item ;
 extern const char * version;
 extern char terminalName[64];
-extern String label;
 void led_loop(state_t md);
 
 #endif

@@ -75,7 +75,6 @@ int default_item = -1;
 double amount_no_ok_needed = AMOUNT_NO_OK_NEEDED;
 const char * version = VERSION;
 double paid = 0;
-String label = "unset";
 
 // Hardcode for Europe (ESP32/Espresifs defaults for CEST seem wrong)./
 const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
@@ -232,7 +231,7 @@ static void setupWiFiConnectionOrReboot() {
     updateDisplay_progressBar((float)millis() / WIFI_MAX_WAIT);
     delay(200);
   };
-  displayForceShowError((char *)"Wifi Problem");
+  displayForceShowErrorModal((char *)"Wifi Problem");
   delay(2000);
   ESP.restart();
 }
@@ -246,7 +245,7 @@ static board_t detectBoard() {
 bool isPaired = false;
 void setup()
 {
-  char * p =  __FILE__;
+  const char * p = __FILE__;
   if (rindex(p, '/')) p = rindex(p, '/') + 1;
 
   Serial.begin(115200);
@@ -413,23 +412,18 @@ void loop()
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
-      md = (payByREST(tag, prices[amount], descs[amount]) == 200) ? PAID : OEPSIE;
+      if (payByREST(tag, prices[amount], descs[amount]) != 200) {
+        displayForceShowErrorModal("Payment failed");
+        md = ENTER_AMOUNT;
+      } else {
+        md = PAID;
+        extra_show_delay = 1500;
+      };
       memset(tag, 0, sizeof(tag));
       break;
     case PAID:
-      extra_show_delay = 1500;
       md = ENTER_AMOUNT;
-      memset(tag, 0, sizeof(tag));
-      label = "";
       paid += atof(prices[amount]);
-      break;
-    case OEPSIE:
-      extra_show_delay = 2500;
-      md = ENTER_AMOUNT;
-      memset(tag, 0, sizeof(tag));
-      label = "";
-      break;
-    default:
       break;
   };
 
@@ -446,9 +440,9 @@ void loop()
   if ((millis() - lastchange > 10 * 1000 && md != ENTER_AMOUNT && md != SCREENSAVER)) {
     if (md == OK_OR_CANCEL)
       md = ENTER_AMOUNT;
-    else
-      md = OEPSIE;
-
+    else {
+      displayForceShowErrorModal("Timeout");
+    };
     update = true;
   };
 

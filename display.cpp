@@ -133,7 +133,7 @@ static void scrollpanel_loop() {
 }
 
 static unsigned short lastw = -1;
-void  updateDisplay_startProgressBar(char *str) {
+void  updateDisplay_startProgressBar(const char *str) {
   tft.fillScreen(TFT_BLACK);
   showLogo();
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -257,16 +257,6 @@ void updateDisplay(state_t md)
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.loadFont(AA_FONT_LARGE);
       tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
-      tft.loadFont(AA_FONT_SMALL);
-      tft.drawString(label, tft.width() / 2, tft.height() / 2 - 22);
-      break;
-    case OEPSIE:
-      tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.loadFont(AA_FONT_LARGE);
-      tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
-      tft.loadFont(AA_FONT_SMALL);
-      tft.drawString(label, tft.width() / 2, tft.height() / 2 + 2);
-      tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
       break;
     case FIRMWARE_UPDATE:
       updateDisplay_startProgressBar("firmware update");
@@ -278,7 +268,6 @@ void updateDisplay(state_t md)
       tft.loadFont(AA_FONT_MEDIUM);
       tft.drawString("update aborted", tft.width() / 2,  40);
       tft.loadFont(AA_FONT_LARGE);
-      tft.drawString(label, tft.width() / 2,  tft.height() / 2);
       break;
   }
 }
@@ -304,7 +293,7 @@ void updateClock(bool force) {
   tft.setTextDatum(TR_DATUM);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.loadFont(AA_FONT_TINY);
-  int padding = tft.textWidth(p, -1); 
+  int padding = tft.textWidth(p, -1);
   tft.setTextPadding(padding);
 
   tft.drawString(p, tft.width(), 0);
@@ -317,7 +306,7 @@ void updateClock(bool force) {
   tft.drawString(str, 0, 0);
 };
 
-void updateDisplay_progressText(char * str) {
+void updateDisplay_progressText(const char * str) {
   Log.println(str);
   // updateDisplay();
   tft.setTextDatum(MC_DATUM);
@@ -330,7 +319,7 @@ void updateDisplay_progressText(char * str) {
   tft.drawString(str, tft.width() / 2,  tft.height() - 20);
 }
 
-void updateDisplay_warningText(char * str) {
+void updateDisplay_warningText(const char * str) {
   Log.println(str);
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -340,10 +329,18 @@ void updateDisplay_warningText(char * str) {
   tft.drawString(str, tft.width() / 2,  tft.height() - 20);
 }
 
-void displayForceShowError(char * str) {
-  label = String(str);
-  updateDisplay(OEPSIE);
-  delay(1000);
+void displayForceShowErrorModal(const char * str) {
+  tft.fillScreen(TFT_BLACK);
+  updateClock(true);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+
+  tft.loadFont(AA_FONT_LARGE);
+  tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
+  tft.loadFont(AA_FONT_SMALL);
+  tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
+  tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
+  delay(1500);
 }
 
 void setTFTPower(bool onoff) {
