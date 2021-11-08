@@ -11,7 +11,7 @@
 
 void setupOTA() {
   ArduinoOTA.setHostname(terminalName);
-  
+
 #ifdef OTA_HASH
   ArduinoOTA.setPasswordHash(OTA_HASH);
 #else
@@ -22,8 +22,8 @@ void setupOTA() {
 
   ArduinoOTA
   .onStart([]() {
-    led_loop(FIRMWARE_UPDATE);
-    updateDisplay(FIRMWARE_UPDATE);
+    led_loop(BOOT);
+    updateDisplay_startProgressBar("firmware update");
   })
   .onEnd([]() {
     // wipe the keys - to prevent some cleversod from uploading something to
@@ -49,5 +49,5 @@ void setupOTA() {
 };
 
 void ota_loop() {
-    ArduinoOTA.handle();
+  ArduinoOTA.handle();
 }

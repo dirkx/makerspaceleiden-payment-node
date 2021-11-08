@@ -35,7 +35,7 @@ class MqttStream : public TLog {
     PubSubClient * _mqtt = NULL;
     const char * _mqttServer, * _mqttTopic;
     uint16_t _mqttPort;
-    char logbuff[200]; // 256 is the normal mqtt msg max.
+    char logbuff[220]; // 256 is the normal mqtt msg max.
     size_t at = 0;
   protected:
 };

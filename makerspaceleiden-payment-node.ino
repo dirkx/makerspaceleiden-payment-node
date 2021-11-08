@@ -29,11 +29,10 @@ char terminalName[64];
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <SPI.h>
+#include <HTTPClient.h> // for the HTTP error codes.
 #include <ESPmDNS.h>
 #include "esp_heap_caps.h"
 
-#include <MFRC522.h>
 #include <Button2.h>
 #include <analogWrite.h>
 
@@ -229,10 +228,10 @@ static void setupWiFiConnectionOrReboot() {
       return;
 
     updateDisplay_progressBar((float)millis() / WIFI_MAX_WAIT);
-    delay(200);
+    delay(HTTP_CODE_OK);
   };
   displayForceShowErrorModal((char *)"Wifi Problem");
-  delay(2000);
+  delay(2500);
   ESP.restart();
 }
 
@@ -346,10 +345,10 @@ void loop()
                  "\"ota\":true,\"state\":3,\"IP_address\":\"%s\","\
                  "\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
                  "\"Firmware\":\"%s\",\"heap\":%u}\n",
-                 stationname, rfid_scans, rfid_miss, 
-                 String(WiFi.localIP()).c_str(), 
+                 stationname, rfid_scans, rfid_miss,
+                 String(WiFi.localIP()).c_str(),
                  String(WiFi.macAddress()).c_str(), paid,
-                 VERSION, terminalName,  
+                 VERSION, terminalName,
                  (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 
       last_report = millis();
@@ -379,9 +378,9 @@ void loop()
       return;
     case REGISTER_PRICELIST:
       { int httpCode = fetchPricelist();
-        if (httpCode = 200)
+        if (httpCode = HTTP_CODE_OK)
           md = ENTER_AMOUNT;
-        else if (httpCode = 400)
+        else if (httpCode = HTTP_CODE_BAD_REQUEST)
           md = REGISTER; // something gone very wrong server side - simply reset/retry.
         return;
       };
@@ -413,13 +412,16 @@ void loop()
         };
       };
       break;
+    case OK_OR_CANCEL:
+      // time out handled by generic timeout.
+      break;
     case DID_CANCEL:
       displayForceShowErrorModal("Cancelled");
       md = ENTER_AMOUNT;
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
-      if (payByREST(tag, prices[amount], descs[amount]) != 200) {
+      if (payByREST(tag, prices[amount], descs[amount]) != HTTP_CODE_OK) {
         displayForceShowErrorModal("Payment failed");
         md = ENTER_AMOUNT;
       } else {

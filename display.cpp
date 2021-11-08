@@ -239,14 +239,6 @@ void updateDisplay(state_t md)
       tft.loadFont(AA_FONT_SMALL);
       tft.drawString("paying..", tft.width() / 2, tft.height() / 2 - 52);
       break;
-    case PAID:
-      tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.loadFont(AA_FONT_LARGE);
-      tft.drawString("PAID", tft.width() / 2, tft.height() / 2 +  22);
-      break;
-    case FIRMWARE_UPDATE:
-      updateDisplay_startProgressBar("firmware update");
-      break;
   }
 }
 

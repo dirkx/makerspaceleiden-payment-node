@@ -162,10 +162,14 @@ bool fetchCA() {
   // provide the root CA. but we do not know it (yet). So learn it first.
   //
   client.setInsecure();
+
   if (!https.begin(client, PAY_URL NONE_PATH )) {
     Log.println("Failed to begin https - fetchCA");
     goto exit;
   };
+
+  https.setTimeout(HTTP_TIMEOUT);
+  https.setUserAgent(terminalName);
 
   if (https.GET() < 0) {
     Log.println("Failed to begin https (GET, fetchCA)");
@@ -206,7 +210,7 @@ bool registerDevice() {
   client.setCACert(ca_root);
   client.setCertificate(client_cert_as_pem);
   client.setPrivateKey(client_key_as_pem);
-
+  
   snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?name=%s",
            _argencode((char *) tmp, sizeof(tmp), terminalName));
 
@@ -215,9 +219,12 @@ bool registerDevice() {
     goto exit;
   };
 
+  https.setTimeout(HTTP_TIMEOUT);
+  https.setUserAgent(terminalName);
+
   httpCode =  https.GET();
-  if (httpCode != 401) {
-    Log.printf("Not gotten the 401 I expected; but %d: %s\n", httpCode, https.getString().c_str());
+  if (httpCode != HTTP_CODE_UNAUTHORIZED) {
+    Log.printf("Not gotten the HTTP_CODE_UNAUTHORIZED I expected; but %d: %s\n", httpCode, https.getString().c_str());
     goto exit;
   };
   peer = client.getPeerCertificate();
@@ -270,6 +277,9 @@ bool registerDeviceWithSwipe(char *tag) {
 
   snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?response=%s", (char *)tmp);
 
+  https.setTimeout(HTTP_TIMEOUT);
+  https.setUserAgent(terminalName);
+
   if (!https.begin(client, (char *)buff )) {
     Log.println("Failed to begin https");
     goto exit;
@@ -284,7 +294,7 @@ bool registerDeviceWithSwipe(char *tag) {
     goto exit;
   }
 
-  if (httpCode != 200) {
+  if (httpCode != HTTP_CODE_OK) {
     Log.println("Failed to register");
     goto exit;
   }
@@ -369,6 +379,7 @@ JSONVar rest(const char *url, int * statusCode) {
   client.setPrivateKey(client_key_as_pem);
 
   https.setTimeout(HTTP_TIMEOUT);
+  https.setUserAgent(terminalName);
 
   if (!https.begin(client, url)) {
     Log.println("setup fail");
@@ -400,7 +411,7 @@ JSONVar rest(const char *url, int * statusCode) {
   }
 
   payload = https.getString();
-  if (httpCode == 200) {
+  if (httpCode == HTTP_CODE_OK) {
     Log.print("Payload: ");
     Log.println(payload);
     res = JSON.parse(payload);
@@ -437,7 +448,7 @@ int payByREST(char *tag, char * amount, char *lbl) {
   int httpCode = 0;
   JSONVar res = rest(buff, &httpCode);
 
-  if (httpCode == 200) {
+  if (httpCode == HTTP_CODE_OK) {
     bool ok = false;
     // label = String((const char*) res["user"]);
 
@@ -445,7 +456,7 @@ int payByREST(char *tag, char * amount, char *lbl) {
       ok = (bool) res["result"];
 
     if (!ok) {
-      Log.println("200 Ok, but false / incpmplete result.");
+      Log.println("HTTP_CODE_OK Ok, but false / incpmplete result.");
       httpCode = 600;
     }
   };
@@ -459,12 +470,12 @@ int fetchPricelist() {
   updateDisplay_progressText("fetching prices");
 
   JSONVar res = rest(PAY_URL REGISTER_PATH, &httpCode);
-  if (httpCode == 400) {
+  if (httpCode == HTTP_CODE_BAD_REQUEST) {
     // propably too soon/fast
     updateDisplay_progressText("re-pairing wit existing key");
     return httpCode;
   };
-  if (httpCode != 200) {
+  if (httpCode != HTTP_CODE_OK) {
     Log.println("SKU price list fetch failed.");
     return httpCode;
   }
