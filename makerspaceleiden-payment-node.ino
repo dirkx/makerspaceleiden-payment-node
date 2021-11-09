@@ -81,7 +81,7 @@ const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 // values above this amount will get an extra 'OK' question.
 
 state_t md = BOOT;
-board_t BOARD = BOARD_V1;
+board_t BOARD = BOARD_V4;
 
 // Updates the small clock in the top right corner; and
 // will reboot the unit early mornings.
@@ -123,11 +123,13 @@ static void loop_RebootAtMidnight() {
 void settupButtons()
 {
   if (BOARD != BOARD_V2) {
+    // buttons with pullup; wired to GND
     btn1 = new Button2(BUTTON_1, INPUT_PULLUP);
     btn2 = new Button2(BUTTON_2, INPUT_PULLUP);
   } else {
-    btn1 = new Button2(BUTTON_1, INPUT, false, false /* active low */);
-    btn2 = new  Button2(BUTTON_2, INPUT, false, false /* active low */);
+    // buttons wired to VCC.
+    btn1 = new Button2(BUTTON_1, INPUT, false, false /* active high, normal low */);
+    btn2 = new Button2(BUTTON_2, INPUT, false, false /* active high, normal low */);
   };
   btn1->setPressedHandler([](Button2 & b) {
     if (md == SCREENSAVER) {
@@ -237,14 +239,30 @@ static void setupWiFiConnectionOrReboot() {
 }
 
 static board_t detectBoard() {
-  pinMode(BOARD_V3_SENSE, INPUT_PULLUP);
-  if (digitalRead(BOARD_V3_SENSE) == LOW)
+  unsigned char mac[6];
+  WiFi.macAddress(mac);
+  
+  // C8:C9:A3:CB:B6:7C - Grijpvoorraad - buttons aan '+'
+  if (mac[3] == 0xCB && mac[4] == 0xB6 && mac[5] == 0x7C)
+    return BOARD_V2;
+    
+  // 80:7D:3A:D5:46:8C - Voorruimte - buttons aan GND
+  if (mac[3] == 0xD5 && mac[4] == 0x46 && mac[5] == 0x8C)
     return BOARD_V3;
 
-  pinMode(BUTTON_1, INPUT_PULLUP);
-  pinMode(BUTTON_2, INPUT_PULLUP);
-  return (digitalRead(BUTTON_1) && digitalRead(BUTTON_1))  ? BOARD_V1 : BOARD_V2;
+  // test board - scherm 180 graden gedraaid.
+  return BOARD_V4;
 };
+
+static const char * board2name(board_t x) {
+  switch(x) {
+    case BOARD_V2: return "v3: buttons VCC, LEDs on LOW";
+    case BOARD_V3: return "v4: buttons GND, LEDs on HIGH";
+    case BOARD_V4: return "v5: buttons GND, LEDs on HIGH, Screen flipped";
+    default: break;
+  }
+  return "Dunno";
+}
 
 bool isPaired = false;
 void setup()
@@ -264,8 +282,7 @@ void setup()
   Serial.println(terminalName);
   Serial.println("Version : " VERSION);
   Serial.println("Compiled: " __DATE__ " " __TIME__);
-  const char *_boards[] = { "V1 (no backlight)", "V2 (buttons pulled high)", "V3 (backlight)" };
-  Serial.printf( "Revision: %s\n", _boards[BOARD]);
+  Serial.printf( "Revision: %s\n", board2name(BOARD));
   Serial.printf( "Heap    :  %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
   Serial.print(  "MacAddr:  ");
   Serial.println(WiFi.macAddress());
@@ -323,6 +340,7 @@ void setup()
   Log.println("Build:    " __DATE__ " " __TIME__ );
   Log.print(  "Unit:     ");
   Log.println(terminalName);
+  Log.printf( "Revision: %s\n", board2name(BOARD));
   Log.print(  "MacAddr:  ");
   Log.println(WiFi.macAddress());
   Log.print(  "IP:       ");
@@ -340,6 +358,7 @@ void loop()
   static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
   unsigned int extra_show_delay = 0;
+
   Log.loop();
   Debug.loop();
   loop_RebootAtMidnight();
@@ -434,7 +453,7 @@ void loop()
         displayForceShowErrorModal("Payment failed");
         md = ENTER_AMOUNT;
       } else {
-        displayForceShowErrorModal("Paid");
+        displayForceShowModal("Paid");
         extra_show_delay = 1500;
         md = ENTER_AMOUNT;
         paid += atof(prices[amount]);

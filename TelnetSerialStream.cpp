@@ -54,6 +54,8 @@ void TelnetSerialStream::loop() {
         if (_serverClients[i])
           _serverClients[i].stop();
         _serverClients[i] = _server->available();
+        _serverClients[i].print(stationname);
+        _serverClients[i].print("@");
         _serverClients[i].print(terminalName);
         _serverClients[i].print(" Serial connected ");
         _serverClients[i].println(WiFi.macAddress());

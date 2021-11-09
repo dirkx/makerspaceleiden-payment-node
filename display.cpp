@@ -28,14 +28,11 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 
 void setupTFT() {
 #ifdef TFT_BL
-  if (BOARD > BOARD_V1) {
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, (!TFT_BACKLIGHT_ON));
-  };
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, (!TFT_BACKLIGHT_ON));
 #endif
-
   tft.init();
-  tft.setRotation((BOARD > BOARD_V2) ? TFT_ROTATION - 2 : TFT_ROTATION);
+  tft.setRotation((BOARD == BOARD_V4) ? TFT_ROTATION - 2 : TFT_ROTATION);
 #ifndef _H_BLUEA160x128
   tft.setSwapBytes(true);
 #endif
@@ -314,18 +311,21 @@ void displayForceShowErrorModal(const char * str) {
   delay(1500);
 }
 
+void displayForceShowModal(const char * str) {
+  tft.fillScreen(TFT_BLACK);
+  showLogo();
+  updateClock(true);
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.setTextDatum(MC_DATUM);
+
+  tft.loadFont(AA_FONT_LARGE);
+  tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
+  delay(1500);
+}
+
 void setTFTPower(bool onoff) {
-  // only board V2 has this wire soldered. We do the BL switch on/off before/after the
-  // 100 mSecond delay - as during initial setup the memory leftover content of a previous
-  // boot/statet/etc are sometimes shown; and gives an odd flash. So we during on we
-  // first get the chip on; then power on the LED; and when we switch off; we do the
-  // reverse.
   Log.println(onoff ? "Powering display on" : "Powering display off");
-
 #ifdef  TFT_BL
-  if (BOARD == BOARD_V1)
-    return;
-
   if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif
 
@@ -338,8 +338,8 @@ void setTFTPower(bool onoff) {
 #error "No onoff driver for this TFT screen"
 #endif
 #endif
-  delay(100);
 
+  delay(100);
 #ifdef  TFT_BL
   if (onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif

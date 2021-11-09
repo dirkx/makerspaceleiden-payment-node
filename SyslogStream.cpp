@@ -44,7 +44,7 @@ size_t SyslogStream::write(uint8_t c) {
           p += 4; // See section 4.1.2 of RFC 4164
           p[strlen(p)-1] = 0;
           };
-          syslog.printf("<135> %s %s %s", p, terminalName, logbuff);
+          syslog.printf("<135> %s.%s %s %s", p, stationname, terminalName, logbuff);
         };
         syslog.endPacket();
       };

@@ -77,9 +77,10 @@ typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_
 //    No blacklight control.
 // v2 has its buttons wired to the VCC; with pulldowns.
 //    detect this board by checking that BUT1/2 are 
-//    pulled low. Backlight on pin 4.
-//
-typedef enum { BOARD_V1,  BOARD_V2, BOARD_V3  } board_t;
+//    pulled low. Backlight on pin 4. -- grijpvoorraad
+// v3 buttons to GND, LEDs on on HIGH -- voorruimte
+// v4 buttons to GND, LEDs on on HIGH, screen flipped.
+typedef enum { BOARD_V2,  BOARD_V3, BOARD_V4 } board_t;
 extern board_t BOARD;
 
 
@@ -94,6 +95,7 @@ extern double amount_no_ok_needed;
 extern int default_item ;
 extern const char * version;
 extern char terminalName[64];
+extern const char * stationname;
 void led_loop(state_t md);
 
 #endif

@@ -1,6 +1,5 @@
 #ifndef _H_MPN_REST
 #define _H_MPN_REST
-extern const char * stationname;
 
 // int setupPrices(char *tag);
 void wipekeys();
