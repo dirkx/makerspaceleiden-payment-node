@@ -111,7 +111,7 @@ static void loop_RebootAtMidnight() {
   p[5] = 0;
 
   if (strncmp(p, AUTO_REBOOT_TIME, strlen(AUTO_REBOOT_TIME)) == 0 && millis() > 3600UL) {
-    Log.printf("Nightly reboot of %s has come - also to fetch new pricelist and fix any memory leaks.", p);
+    Log.printf("Nightly reboot of %s has come - also to fetch new pricelist and fix any memory leaks.\n", p);
     yield();
     delay(1000);
     yield();
