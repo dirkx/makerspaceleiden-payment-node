@@ -13,9 +13,10 @@
 
 /* change log:
  * 1.03	2021/10/02 trust/pairing, screensaver, less momory
- * 1.04 ??         no screensaver on V1 boards, auto detect 
+ * 1.04 2021/11/09 no screensaver on V1 boards, auto detect 
  *                 board, logging (telnet, syslog, mqtt), falish
- *                 reporting much like the ACL nodes.
+ *                 reporting much like the ACL nodes. Support V3
+ *                 boards.
  */
 
 #ifndef TERMINAL_NAME

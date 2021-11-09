@@ -98,7 +98,6 @@ static void loop_RebootAtMidnight() {
     time_t now = time(nullptr);
     char * p = ctime(&now);
     p[5 + 11 + 3] = 0;
-    Log.printf("%s Heap: %d Kb\n", p, (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
   }
   time_t now = time(nullptr);
   if (now < 3600)
@@ -112,7 +111,10 @@ static void loop_RebootAtMidnight() {
   p[5] = 0;
 
   if (strncmp(p, AUTO_REBOOT_TIME, strlen(AUTO_REBOOT_TIME)) == 0 && millis() > 3600UL) {
-    Log.println("Nightly reboot - also to fetch new pricelist and fix any memory eaks.");
+    Log.printf("Nightly reboot of %s has come - also to fetch new pricelist and fix any memory leaks.", p);
+    yield();
+    delay(1000);
+    yield();
     ESP.restart();
   }
 #endif
@@ -354,10 +356,10 @@ void loop()
                  "\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
                  "\"Firmware\":\"%s\",\"heap\":%u}\n",
                  stationname, rfid_scans, rfid_miss,
-                 String(WiFi.localIP()).c_str(),
+                 WiFi.localIP().toString().c_str(),
                  String(WiFi.macAddress()).c_str(), paid,
                  VERSION, terminalName,
-                 (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
       last_report = millis();
     }
