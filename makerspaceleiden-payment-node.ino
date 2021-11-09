@@ -83,7 +83,6 @@ const char * cestTimezone = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 state_t md = BOOT;
 board_t BOARD = BOARD_V1;
 
-
 // Updates the small clock in the top right corner; and
 // will reboot the unit early mornings.
 //
@@ -121,7 +120,7 @@ static void loop_RebootAtMidnight() {
 
 void settupButtons()
 {
-  if (BOARD == BOARD_V2) {
+  if (BOARD != BOARD_V2) {
     btn1 = new Button2(BUTTON_1, INPUT_PULLUP);
     btn2 = new Button2(BUTTON_2, INPUT_PULLUP);
   } else {
@@ -236,6 +235,10 @@ static void setupWiFiConnectionOrReboot() {
 }
 
 static board_t detectBoard() {
+  pinMode(BOARD_V3_SENSE, INPUT_PULLUP);
+  if (digitalRead(BOARD_V3_SENSE) == LOW)
+    return BOARD_V3;
+
   pinMode(BUTTON_1, INPUT_PULLUP);
   pinMode(BUTTON_2, INPUT_PULLUP);
   return (digitalRead(BUTTON_1) && digitalRead(BUTTON_1))  ? BOARD_V1 : BOARD_V2;
@@ -259,7 +262,8 @@ void setup()
   Serial.println(terminalName);
   Serial.println("Version : " VERSION);
   Serial.println("Compiled: " __DATE__ " " __TIME__);
-  Serial.printf( "Revision: %s\n", BOARD == BOARD_V2 ? "V2 (buttons pulled high)" : "V1 (no backlight)");
+  const char *_boards[] = { "V1 (no backlight)", "V2 (buttons pulled high)", "V3 (backlight)" };
+  Serial.printf( "Revision: %s\n", _boards[BOARD]);
   Serial.printf( "Heap    :  %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
   Serial.print(  "MacAddr:  ");
   Serial.println(WiFi.macAddress());
@@ -300,16 +304,9 @@ void setup()
 #endif
   Log.addPrintStream(std::make_shared<MqttStream>(mqttStream));
 #endif
+  Log.begin();
+  Debug.begin();
 
-  Log.printf( "File:     %s\n", p);
-  Log.println("Firmware: " TERMINAL_NAME "-" VERSION);
-  Log.println("Build:    " __DATE__ " " __TIME__ );
-  Log.print(  "Unit:     ");
-  Log.println(terminalName);
-  Log.print(  "MacAddr:  ");
-  Log.println(WiFi.macAddress());
-  Log.print(  "IP:     ");
-  Log.println(WiFi.localIP());
 
   setupOTA();
 
@@ -318,15 +315,26 @@ void setup()
   //
   configTzTime(cestTimezone, NTP_POOL);
 
+
+  Log.printf( "File:     %s\n", p);
+  Log.println("Firmware: " TERMINAL_NAME "-" VERSION);
+  Log.println("Build:    " __DATE__ " " __TIME__ );
+  Log.print(  "Unit:     ");
+  Log.println(terminalName);
+  Log.print(  "MacAddr:  ");
+  Log.println(WiFi.macAddress());
+  Log.print(  "IP:       ");
+  Log.println(WiFi.localIP());
+  Log.printf("Heap:     %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
+
+  Log.println("Starting loop");
   md = WAITING_FOR_NTP;
   updateDisplay_progressText("Waiting for NTP");
-  Log.println("Starting loop");
-  Log.printf("Heap: %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
 }
 
 void loop()
 {
-  static unsigned long lastchange = 0;
+  static unsigned long lastchange = -1;
   static state_t laststate = WAITING_FOR_NTP;
   static int last_amount = -1;
   unsigned int extra_show_delay = 0;
@@ -359,30 +367,29 @@ void loop()
     case WAITING_FOR_NTP:
       if (time(nullptr) > 3600)
         md = FETCH_CA;
-      return;
       break;
     case FETCH_CA:
       if (fetchCA())
         md = isPaired ? REGISTER_PRICELIST : REGISTER;
-      return;
+      break;
     case REGISTER:
       if (registerDevice())
         md = WAIT_FOR_REGISTER_SWIPE;
-      return;
+      break;
     case WAIT_FOR_REGISTER_SWIPE:
       if (loopRFID())
         if (registerDeviceWithSwipe(tag)) {
           isPaired = true;
           md = REGISTER_PRICELIST;
         };
-      return;
+      break;
     case REGISTER_PRICELIST:
       { int httpCode = fetchPricelist();
         if (httpCode = HTTP_CODE_OK)
           md = ENTER_AMOUNT;
         else if (httpCode = HTTP_CODE_BAD_REQUEST)
           md = REGISTER; // something gone very wrong server side - simply reset/retry.
-        return;
+        break;
       };
     case SCREENSAVER:
       if (update) {
@@ -444,7 +451,7 @@ void loop()
   // generic time/error out if something takes longer than 1- seconds and we are in a state
   // where one does not expect this.
   //
-  if ((millis() - lastchange > 10 * 1000 && md != ENTER_AMOUNT && md != SCREENSAVER)) {
+  if ((millis() - lastchange > 10 * 1000 && md > ENTER_AMOUNT )) {
     if (md == OK_OR_CANCEL)
       md = ENTER_AMOUNT;
     else {

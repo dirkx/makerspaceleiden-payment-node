@@ -69,7 +69,7 @@
 #define NTP_POOL "nl.pool.ntp.org"
 #endif
 
-typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK, SCREENSAVER  } state_t;
+typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_SWIPE, REGISTER_PRICELIST, SCREENSAVER, ENTER_AMOUNT, OK_OR_CANCEL, DID_CANCEL, DID_OK } state_t;
 
 // Board differences
 // v1 buttons pull to ground; with internal PULLUP used. 
@@ -78,7 +78,7 @@ typedef enum { BOOT = 0, WAITING_FOR_NTP, FETCH_CA, REGISTER, WAIT_FOR_REGISTER_
 //    detect this board by checking that BUT1/2 are 
 //    pulled low. Backlight on pin 4.
 //
-typedef enum { BOARD_V1,  BOARD_V2 } board_t;
+typedef enum { BOARD_V1,  BOARD_V2, BOARD_V3  } board_t;
 extern board_t BOARD;
 
 

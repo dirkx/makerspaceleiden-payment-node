@@ -11,19 +11,21 @@ class MqttStream : public TLog {
     const char * name() {
       return "MqttStream";
     }
-    MqttStream(Client * client, const char * mqttServer = NULL, const char * mqttTopic = "log", const uint16_t mqttPort = 1833) :
+    MqttStream(Client * client, const char * mqttServer = NULL, const char * mqttTopic = NULL, const uint16_t mqttPort = 1883) :
       _client(client), _mqttServer(mqttServer), _mqttTopic(mqttTopic), _mqttPort(mqttPort) {};
 
     void setPort(uint16_t port) {
       _mqttPort = port;
     }
 
-    void setServer(const char * topic) {
-      _mqttTopic = topic;
+    void setTopic(const char * topic) {
+      if (topic)
+        _mqttTopic = strdup(topic);
     }
 
-    void setTopic(const char * server) {
-      _mqttServer = server;
+    void setServer(const char * server) {
+      if (server)
+        _mqttServer = strdup(server);
     }
 
     virtual size_t write(uint8_t c);

@@ -28,14 +28,14 @@ TFT_eSprite spr = TFT_eSprite(&tft);
 
 void setupTFT() {
 #ifdef TFT_BL
-  if (BOARD == BOARD_V2) {
+  if (BOARD > BOARD_V1) {
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, (!TFT_BACKLIGHT_ON));
   };
 #endif
 
   tft.init();
-  tft.setRotation(TFT_ROTATION);
+  tft.setRotation((BOARD > BOARD_V2) ? TFT_ROTATION - 2 : TFT_ROTATION);
 #ifndef _H_BLUEA160x128
   tft.setSwapBytes(true);
 #endif
@@ -154,6 +154,7 @@ void updateDisplay_progressBar(float p)
 
 void updateDisplay(state_t md)
 {
+  // Serial.printf("Update %d\n", md);
   tft.fillScreen(TFT_BLACK);
   updateClock(true);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);

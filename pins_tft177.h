@@ -17,13 +17,14 @@
 // #define TFT_DC              27
 // #define TFT_RST              2
 
-#define TFT_BL           4
+#define TFT_BL              4
 #define TFT_BACKLIGHT_ON    HIGH
 
 #define LED_1               23 // CANCELand left red light
 #define LED_2               22 // OK and right red light
 #define BUTTON_1            32 // CANCEL and LEFT button
 #define BUTTON_2            33 // OK and right button
+#define BOARD_V3_SENSE      35 // hard wired to GND on board V3
 
 #define RFID_SCLK           16 // shared with screen
 #define RFID_MOSI            5 // shared with screen
