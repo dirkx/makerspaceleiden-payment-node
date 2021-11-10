@@ -43,7 +43,7 @@ const char * KS_KEY_CLIENT_CRT = "ccap";
 const char * KS_KEY_CLIENT_KEY = "ckap";
 const char * KS_KEY_SERVER_KEY = "ssk";
 
-const char * stationname = NULL;
+const char * stationname = "unset";
 
 const unsigned short KS_VERSION = 0x100;
 
@@ -186,7 +186,7 @@ bool fetchCA() {
   while (peer->next) peer = peer->next;
   ca_root = der2pem("CERTIFICATE", peer->raw.p, peer->raw.len);
 
-  updateDisplay_progressText("CA Cert fetched");
+  updateDisplay_progressText("trust fetched");
   ok = true;
 exit:
   https.end();
@@ -210,7 +210,7 @@ bool registerDevice() {
   client.setCACert(ca_root);
   client.setCertificate(client_cert_as_pem);
   client.setPrivateKey(client_key_as_pem);
-  
+
   snprintf((char *) buff, sizeof(buff),  PAY_URL REGISTER_PATH "?name=%s",
            _argencode((char *) tmp, sizeof(tmp), terminalName));
 
@@ -388,8 +388,8 @@ JSONVar rest(const char *url, int * statusCode) {
 
   int httpCode = https.GET();
 
-  Log.print("Result: ");
-  Log.println(httpCode);
+  Debug.print("HTTP reponse: ");
+  Debug.println(httpCode);
 
   if (httpCode < 0) {
     Log.println("Rebooting, wifi issue" );
@@ -410,15 +410,16 @@ JSONVar rest(const char *url, int * statusCode) {
     goto exit;
   }
 
+  Debug.print("Payload: ");
   payload = https.getString();
+  Debug.println(payload);
+  
   if (httpCode == HTTP_CODE_OK) {
-    Log.print("Payload: ");
-    Log.println(payload);
     res = JSON.parse(payload);
+    Debug.println("parsed as json fine");
   }  else  {
-    Log.println(url);
-    Log.println(payload);
-    Log.printf("REST failed: %d - %s", httpCode, https.getString());
+    Log.printf("REST failed: %d -- %s\n", httpCode, payload.c_str());
+    Debug.println(payload);
   };
 exit:
   https.end();
@@ -518,9 +519,9 @@ int fetchPricelist() {
     if (item["default"])
       amount = default_item = i;
 
-    Log.printf("%12s %c %s\n", amounts[i], i == default_item ? '*' : ' ', prices[i]);
+    Debug.printf("%12s %c %s\n", amounts[i], i == default_item ? '*' : ' ', prices[i]);
   };
-  Log.printf("%d items total\n", len);
+  Debug.printf("Pricelist fetched; %d item%s\n", len, len > 1 ? "s" : "");
   NA = len;
   updateDisplay_progressText("got prices");
   return httpCode;

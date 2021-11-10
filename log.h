@@ -6,6 +6,8 @@
 #include <vector>
 #include <functional>
 
+#define REPORT_INTERVAL (10*60*1000)
+
 class LOGBase : public Print {
 public:
     virtual const char * name() { return "base"; }
@@ -26,7 +28,7 @@ class TLog : public LOGBase
     void addPrintStream(const std::shared_ptr<LOGBase> &_handler) {
       auto it = find(handlers.begin(), handlers.end(), _handler);
       if ( handlers.end() == it)
-        handlers.push_back(_handler);
+        handlers.emplace_back(_handler); // we're not using push_back; that copies; but use a reference. As it can see reuse.
     };
     virtual void begin() {
       for (auto it = handlers.begin(); it != handlers.end(); ++it) {
@@ -55,4 +57,7 @@ class TLog : public LOGBase
 
 extern TLog Log;
 extern TLog Debug;
+
+void setupLog();
+void log_loop();
 #endif

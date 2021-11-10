@@ -6,13 +6,15 @@
 
 #include "log.h"
 
+
 class MqttStream : public TLog {
   public:
     const char * name() {
       return "MqttStream";
     }
     MqttStream(Client * client, const char * mqttServer = NULL, const char * mqttTopic = NULL, const uint16_t mqttPort = 1883) :
-      _client(client), _mqttServer(mqttServer), _mqttTopic(mqttTopic), _mqttPort(mqttPort) {};
+      _client(client), _mqttServer(mqttServer), _mqttTopic(mqttTopic), _mqttPort(mqttPort) {
+    };
 
     void setPort(uint16_t port) {
       _mqttPort = port;

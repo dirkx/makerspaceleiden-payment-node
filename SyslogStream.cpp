@@ -38,13 +38,13 @@ size_t SyslogStream::write(uint8_t c) {
           time_t now = time(NULL);
           char * p = "noTime";
           if (now > 3600) {
-          //  0123456789012345678 9 0
-          // "Thu Nov  4 09:47:43\n\0" -> 09:47\0
-          p = ctime(&now);
-          p += 4; // See section 4.1.2 of RFC 4164
-          p[strlen(p)-1] = 0;
+            //  0123456789012345678 9 0
+            // "Thu Nov  4 09:47:43\n\0" -> 09:47\0
+            p = ctime(&now);
+            p += 4; // See section 4.1.2 of RFC 4164
+            p[strlen(p) - 1] = 0;
           };
-          syslog.printf("<135> %s.%s %s %s", p, stationname, terminalName, logbuff);
+          syslog.printf("<135> %s %s.%s %s", p, stationname, terminalName, logbuff);
         };
         syslog.endPacket();
       };

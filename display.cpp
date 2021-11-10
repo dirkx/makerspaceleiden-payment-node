@@ -308,10 +308,11 @@ void displayForceShowErrorModal(const char * str) {
   tft.loadFont(AA_FONT_SMALL);
   tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
   tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
+  Log.printf("Error: %s -- resetting\n", str);
   delay(1500);
 }
 
-void displayForceShowModal(const char * str) {
+void displayForceShow(const char * str) {
   tft.fillScreen(TFT_BLACK);
   showLogo();
   updateClock(true);
@@ -320,11 +321,16 @@ void displayForceShowModal(const char * str) {
 
   tft.loadFont(AA_FONT_LARGE);
   tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
+}
+
+void displayForceShowModal(const char * str) {
+  displayForceShow(str);
   delay(1500);
 }
 
 void setTFTPower(bool onoff) {
   Log.println(onoff ? "Powering display on" : "Powering display off");
+
 #ifdef  TFT_BL
   if (!onoff) digitalWrite(TFT_BL, onoff ? TFT_BACKLIGHT_ON : (!TFT_BACKLIGHT_ON));
 #endif

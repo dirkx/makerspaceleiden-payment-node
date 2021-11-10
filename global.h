@@ -56,12 +56,7 @@
 //
 #define NORMAL_LED_BRIGHTNESS 220
 
-// undef if you do not want the screensaver
-#define SCREENSAVER_TIMEOUT (15 * 60 * 1000 /* 15 mins */)
-
 #define AMOUNT_NO_OK_NEEDED (5.0)
-
-#define REPORT_INTERVAL (10*60*1000)
 
 // Wait up to 10 seconds for wifi during boot.
 #define WIFI_MAX_WAIT (20*1000)
@@ -97,5 +92,6 @@ extern const char * version;
 extern char terminalName[64];
 extern const char * stationname;
 void led_loop(state_t md);
+extern double paid;
 
 #endif

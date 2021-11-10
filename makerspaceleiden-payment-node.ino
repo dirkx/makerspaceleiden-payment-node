@@ -44,23 +44,6 @@ char terminalName[64];
 #include "ota.h"
 #include "rfid.h"
 
-TelnetSerialStream telnetSerialStream = TelnetSerialStream();
-
-#ifdef SYSLOG_HOST
-#include "SyslogStream.h"
-SyslogStream syslogStream = SyslogStream();
-#endif
-
-#ifdef MQTT_HOST
-#include "MqttlogStream.h"
-// EthernetClient client;
-WiFiClient client;
-MqttStream mqttStream = MqttStream(&client, MQTT_HOST);
-char topic[128] = "log/" TERMINAL_NAME;
-#endif
-
-TLog Log, Debug;
-
 Button2 * btn1, * btn2;
 
 int update = false;
@@ -175,6 +158,7 @@ void button_loop()
   btn2->loop();
 }
 
+static unsigned char normal_led_brightness = NORMAL_LED_BRIGHTNESS;
 #ifdef LED_1
 void setupLEDS()
 {
@@ -196,11 +180,11 @@ void led_loop(state_t md) {
 #ifdef ENDLESS
       // Visibly dim the buttons at the end of the strip; as current 'wrap around'
       // is not endless.
-      analogWrite(LED_1, NORMAL_LED_BRIGHTNESS);
-      analogWrite(LED_2, NORMAL_LED_BRIGHTNESS);
+      analogWrite(LED_1, normal_led_brightness);
+      analogWrite(LED_2, normal_led_brightness);
 #else
-      analogWrite(LED_1, amount + 1 == NA ? NORMAL_LED_BRIGHTNESS : (BOARD == BOARD_V2) ? HIGH : LOW);
-      analogWrite(LED_2, amount == 0 ? NORMAL_LED_BRIGHTNESS : (BOARD == BOARD_V2) ? HIGH : LOW);
+      analogWrite(LED_1, amount + 1 == NA ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
+      analogWrite(LED_2, amount == 0 ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
 #endif
       break;
     case OK_OR_CANCEL:
@@ -241,21 +225,24 @@ static void setupWiFiConnectionOrReboot() {
 static board_t detectBoard() {
   unsigned char mac[6];
   WiFi.macAddress(mac);
-  
+
   // C8:C9:A3:CB:B6:7C - Grijpvoorraad - buttons aan '+'
-  if (mac[3] == 0xCB && mac[4] == 0xB6 && mac[5] == 0x7C)
+  if (mac[3] == 0xCB && mac[4] == 0xB6 && mac[5] == 0x7C) {
+    normal_led_brightness = 255;
     return BOARD_V2;
-    
+  };
+
   // 80:7D:3A:D5:46:8C - Voorruimte - buttons aan GND
   if (mac[3] == 0xD5 && mac[4] == 0x46 && mac[5] == 0x8C)
     return BOARD_V3;
 
   // test board - scherm 180 graden gedraaid.
+  normal_led_brightness = 255;
   return BOARD_V4;
 };
 
 static const char * board2name(board_t x) {
-  switch(x) {
+  switch (x) {
     case BOARD_V2: return "v3: buttons VCC, LEDs on LOW";
     case BOARD_V3: return "v4: buttons GND, LEDs on HIGH";
     case BOARD_V4: return "v5: buttons GND, LEDs on HIGH, Screen flipped";
@@ -271,7 +258,6 @@ void setup()
   if (rindex(p, '/')) p = rindex(p, '/') + 1;
 
   Serial.begin(115200);
-
   byte mac[6];
   WiFi.macAddress(mac);
   snprintf(terminalName,  sizeof(terminalName), "%s-%s-%02x%02x%02x", TERMINAL_NAME, VERSION, mac[3], mac[4], mac[5]);
@@ -303,37 +289,13 @@ void setup()
   WiFi.setHostname(terminalName);
 
   setupWiFiConnectionOrReboot();
-
-  Log.addPrintStream(std::make_shared<TelnetSerialStream>(telnetSerialStream));
-  Debug.addPrintStream(std::make_shared<TelnetSerialStream>(telnetSerialStream));
-
-#ifdef SYSLOG_HOST
-  syslogStream.setDestination(SYSLOG_HOST);
-  syslogStream.setRaw(false); // wether or not the syslog server is a modern(ish) unix.
-#ifdef SYSLOG_PORT
-  syslogStream.setPort(SYSLOG_PORT);
-#endif
-  Log.addPrintStream(std::make_shared<SyslogStream>(syslogStream));
-#endif
-
-#ifdef MQTT_HOST
-#ifdef MQTT_TOPIC_PREFIX
-  snprintf(topic, sizeof(topic), "%s/log/%s", MQTT_TOPIC_PREFIX, terminalName);
-  mqttStream.setTopic(topic);
-#endif
-  Log.addPrintStream(std::make_shared<MqttStream>(mqttStream));
-#endif
-  Log.begin();
-  Debug.begin();
-
-
+  setupLog();
   setupOTA();
 
   // try to get some reliable time; to stop my cert
   // checking code complaining.
   //
   configTzTime(cestTimezone, NTP_POOL);
-
 
   Log.printf( "File:     %s\n", p);
   Log.println("Firmware: " TERMINAL_NAME "-" VERSION);
@@ -349,7 +311,6 @@ void setup()
 
   Log.println("Starting loop");
   md = WAITING_FOR_NTP;
-  updateDisplay_progressText("Waiting for NTP");
 }
 
 void loop()
@@ -359,33 +320,19 @@ void loop()
   static int last_amount = -1;
   unsigned int extra_show_delay = 0;
 
-  Log.loop();
-  Debug.loop();
+  log_loop();
   loop_RebootAtMidnight();
   ota_loop();
   button_loop();
 #ifdef LED_1
   led_loop(md);
 #endif
-  {
-    static unsigned  long last_report = millis();
-    if (millis() - last_report > REPORT_INTERVAL) {
-      Log.printf("%s {\"rfid_scans\":%u,\"rfid_misses\":%u,"\
-                 "\"ota\":true,\"state\":3,\"IP_address\":\"%s\","\
-                 "\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
-                 "\"Firmware\":\"%s\",\"heap\":%u}\n",
-                 stationname, rfid_scans, rfid_miss,
-                 WiFi.localIP().toString().c_str(),
-                 String(WiFi.macAddress()).c_str(), paid,
-                 VERSION, terminalName,
-                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
-      last_report = millis();
-    }
-  }
 
   switch (md) {
     case WAITING_FOR_NTP:
+      if (lastchange == -1)
+        updateDisplay_progressText("waiting for time");
       if (time(nullptr) > 3600)
         md = FETCH_CA;
       break;
@@ -417,6 +364,7 @@ void loop()
         Log.println("Wakeup");
         setTFTPower(true);
         md = ENTER_AMOUNT;
+        lastchange = millis(); // prevent jump to default straight after wakeup.
       };
       break;
     case ENTER_AMOUNT:
@@ -449,13 +397,16 @@ void loop()
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
+        displayForceShow("paying");
       if (payByREST(tag, prices[amount], descs[amount]) != HTTP_CODE_OK) {
+        delay(200);
         displayForceShowErrorModal("Payment failed");
         md = ENTER_AMOUNT;
       } else {
         displayForceShowModal("Paid");
         extra_show_delay = 1500;
         md = ENTER_AMOUNT;
+        Log.printf("Paid %.2f\n", atof(prices[amount]));
         paid += atof(prices[amount]);
       };
       memset(tag, 0, sizeof(tag));

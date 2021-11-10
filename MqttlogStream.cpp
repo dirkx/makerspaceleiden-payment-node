@@ -14,11 +14,13 @@
 #include "MqttlogStream.h"
 
 void MqttStream::begin() {
-  PubSubClient * psc = new PubSubClient(*_client);
   if (!_mqttServer || !_mqttTopic || !_mqttPort) {
-    Log.println("Missing server/topic/port for MQTT");
+    Log.printf("Missing%s for MQTT Logging\n",
+               _mqttServer ? "" : " server", _mqttTopic ? "" : " topic", _mqttPort ? "" : " port");
     return;
   }
+  
+  PubSubClient * psc = new PubSubClient(*_client);
   psc->setServer(_mqttServer, _mqttPort);
   psc->connect(_mqttTopic);
 
