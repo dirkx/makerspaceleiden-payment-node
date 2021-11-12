@@ -297,7 +297,7 @@ void updateDisplay_warningText(const char * str) {
   tft.drawString(str, tft.width() / 2,  tft.height() - 20);
 }
 
-void displayForceShowErrorModal(const char * str) {
+void displayForceShowErrorModal(const char * str, const char * substr) {
   tft.fillScreen(TFT_BLACK);
   updateClock(true);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -307,24 +307,30 @@ void displayForceShowErrorModal(const char * str) {
   tft.drawString("ERROR", tft.width() / 2, tft.height() / 2 - 22);
   tft.loadFont(AA_FONT_SMALL);
   tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
-  tft.drawString("resetting...", tft.width() / 2, tft.height() / 2 +  32);
+  tft.drawString((substr && strlen(substr)) ? substr : "resetting...", tft.width() / 2, tft.height() / 2 +  32);
   Log.printf("Error: %s -- resetting\n", str);
   delay(1500);
 }
 
-void displayForceShow(const char * str) {
+void displayForceShow(const char * str, const char * substr) {
   tft.fillScreen(TFT_BLACK);
   showLogo();
   updateClock(true);
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
   tft.setTextDatum(MC_DATUM);
 
-  tft.loadFont(AA_FONT_LARGE);
-  tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
+  if (str) {
+    tft.loadFont(AA_FONT_LARGE);
+    tft.drawString(str, tft.width() / 2, tft.height() / 2 + 2);
+  };
+  if (substr) {
+    tft.loadFont(AA_FONT_SMALL);
+    tft.drawString(substr, tft.width() / 2, tft.height() / 2 - 20);
+  };
 }
 
-void displayForceShowModal(const char * str) {
-  displayForceShow(str);
+void displayForceShowModal(const char * str, const char * substr) {
+  displayForceShow(str, substr);
   delay(1500);
 }
 

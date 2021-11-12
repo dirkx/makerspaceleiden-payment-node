@@ -23,7 +23,7 @@ void MqttStream::begin() {
   PubSubClient * psc = new PubSubClient(*_client);
   psc->setServer(_mqttServer, _mqttPort);
   psc->connect(_mqttTopic);
-
+  psc->setBufferSize(sizeof(logbuff)+9+strlen(_mqttTopic));
   _mqtt = psc;
   loop();
 }

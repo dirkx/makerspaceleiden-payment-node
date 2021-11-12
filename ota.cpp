@@ -42,7 +42,7 @@ void setupOTA() {
     else if (error == OTA_RECEIVE_ERROR) str = "Receive Failed";
     else if (error == OTA_END_ERROR) str = "End Failed";
     else str = "Uknown error";
-    displayForceShowErrorModal(str);
+    displayForceShowErrorModal("OTA abort", str);
     delay(2500);
   });
   ArduinoOTA.begin();

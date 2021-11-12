@@ -10,6 +10,7 @@ bool registerDevice();
 bool registerDeviceWithSwipe(char *tag);
 int fetchPricelist();
 
-int payByREST(char *tag, char * amount, char *lbl);
+#define PBR_LEN (32)
+int payByREST(char *tag, char * amount, char *lbl, char result[PBR_LEN]);
 
 #endif

@@ -393,7 +393,7 @@ JSONVar rest(const char *url, int * statusCode) {
 
   if (httpCode < 0) {
     Log.println("Rebooting, wifi issue" );
-    displayForceShowErrorModal("NET FAIL");
+    displayForceShowErrorModal("FAIL", "No wifi");
     delay(1000);
     ESP.restart();
   }
@@ -428,11 +428,10 @@ exit:
   return res;
 }
 
-int payByREST(char *tag, char * amount, char *lbl) {
-  char buff[512];
-  char desc[128];
-  char tmp[128];
-
+int payByREST(char *tag, char * amount, char *lbl, char result[PBR_LEN]) {
+  char buff[512], desc[128],  tmp[128];
+  memset(result,0,PBR_LEN);
+  
   snprintf(desc, sizeof(desc), "%s. Paid at %s", lbl, stationname);
 
   if (0) {
@@ -451,7 +450,7 @@ int payByREST(char *tag, char * amount, char *lbl) {
 
   if (httpCode == HTTP_CODE_OK) {
     bool ok = false;
-    // label = String((const char*) res["user"]);
+    strncpy(result, (const char*) res["user"],PBR_LEN-1 /* ensure termination; one less */);
 
     if (res.hasOwnProperty("result"))
       ok = (bool) res["result"];

@@ -88,13 +88,14 @@ static void loop_RebootAtMidnight() {
 
 #ifdef AUTO_REBOOT_TIME
   static unsigned long reboot_offset = random(3600);
+  char * q = ctime(&now);
   now += reboot_offset;
   char * p = ctime(&now);
   p += 11;
   p[5] = 0;
 
   if (strncmp(p, AUTO_REBOOT_TIME, strlen(AUTO_REBOOT_TIME)) == 0 && millis() > 3600UL) {
-    Log.printf("Nightly reboot of %s has come - also to fetch new pricelist and fix any memory leaks.\n", p);
+    Log.printf("Nightly reboot of %s has come - also to fetch new pricelist and fix any memory leaks.\n", q);
     yield();
     delay(1000);
     yield();
@@ -129,7 +130,8 @@ void settupButtons()
       md = DID_OK;
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
-    // if (l != amount) Log.println("left");
+    if (l != amount)
+      Debug.println("left");
   });
 
   btn2->setPressedHandler([](Button2 & b) {
@@ -148,7 +150,8 @@ void settupButtons()
 
     update = update || (md != ENTER_AMOUNT) || (l != amount);
 
-    //    if (l != amount) Log.println("right");
+    if (l != amount)
+      Debug.println("right");
   });
 }
 
@@ -217,7 +220,7 @@ static void setupWiFiConnectionOrReboot() {
     updateDisplay_progressBar((float)millis() / WIFI_MAX_WAIT);
     delay(HTTP_CODE_OK);
   };
-  displayForceShowErrorModal((char *)"Wifi Problem");
+  displayForceShowErrorModal((char *)"reboot","WiFi problem");
   delay(2500);
   ESP.restart();
 }
@@ -264,8 +267,6 @@ void setup()
 
   BOARD = detectBoard();
   Serial.printf( "File:     %s\n", p);
-  Serial.print("Start     : " );
-  Serial.println(terminalName);
   Serial.println("Version : " VERSION);
   Serial.println("Compiled: " __DATE__ " " __TIME__);
   Serial.printf( "Revision: %s\n", board2name(BOARD));
@@ -374,7 +375,7 @@ void loop()
         setTFTPower(false);
         return;
       };
-      if (default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item) {
+      if (default_item >= 0 && millis() - lastchange > DEFAULT_TIMEOUT && amount != default_item && amount == last_amount) {
         last_amount = amount = default_item;
         lastchange = millis();
         Log.printf("Jumping back to default item %d: %s\n", default_item, amounts[default_item]);
@@ -392,24 +393,29 @@ void loop()
       // time out handled by generic timeout.
       break;
     case DID_CANCEL:
-      displayForceShowErrorModal("Cancelled");
+      displayForceShowErrorModal("abort","payment cancelled");
       md = ENTER_AMOUNT;
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
-        displayForceShow("paying");
-      if (payByREST(tag, prices[amount], descs[amount]) != HTTP_CODE_OK) {
-        delay(200);
-        displayForceShowErrorModal("Payment failed");
-        md = ENTER_AMOUNT;
-      } else {
-        displayForceShowModal("Paid");
-        extra_show_delay = 1500;
-        md = ENTER_AMOUNT;
-        Log.printf("Paid %.2f\n", atof(prices[amount]));
-        paid += atof(prices[amount]);
+      {
+        char buff[48], who[PBR_LEN];
+        displayForceShow("paying","...");
+        
+        int rc = payByREST(tag, prices[amount], descs[amount], who);
+        if (rc != HTTP_CODE_OK) {
+          snprintf(buff, sizeof(buff), "no payment - %03d", rc);
+          displayForceShowErrorModal("FAIL", buff);
+          md = ENTER_AMOUNT;
+        } else {
+          displayForceShowModal("PAID",who);
+          extra_show_delay = 1500;
+          md = ENTER_AMOUNT;
+          Log.printf("Paid %.2f\n", atof(prices[amount]));
+          paid += atof(prices[amount]);
+        };
+        memset(tag, 0, sizeof(tag));
       };
-      memset(tag, 0, sizeof(tag));
       break;
   };
 
@@ -424,10 +430,12 @@ void loop()
   // where one does not expect this.
   //
   if ((millis() - lastchange > 10 * 1000 && md > ENTER_AMOUNT )) {
-    if (md == OK_OR_CANCEL)
+    if (md == OK_OR_CANCEL) {
+      displayForceShowModal("canceling",NULL);
       md = ENTER_AMOUNT;
+    }
     else {
-      displayForceShowErrorModal("Timeout");
+      displayForceShowErrorModal("Timeout",NULL);
     };
     update = true;
   };

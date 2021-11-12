@@ -9,7 +9,7 @@
 #include "log.h"
 
 #ifndef MAX_SERIAL_TELNET_CLIENTS
-#define MAX_SERIAL_TELNET_CLIENTS 4
+#define MAX_SERIAL_TELNET_CLIENTS 3
 #endif
 
 class TelnetSerialStream : public TLog {

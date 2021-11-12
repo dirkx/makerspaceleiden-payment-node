@@ -17,9 +17,9 @@ void updateDisplay_startProgressBar(const char *str);
 void updateDisplay_progressBar(float p);
 
 void updateDisplay_progressText(const char * str);
-void displayForceShowErrorModal(const char * str);
-void displayForceShowModal(const char * str);
-void displayForceShow(const char * str);
+void displayForceShowErrorModal(const char * str, const char * substr);
+void displayForceShowModal(const char * str, const char * substr);
+void displayForceShow(const char * str, const char * substr);
 void updateDisplay_warningText(const char * str);
 
 void updateClock(bool force);

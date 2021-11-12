@@ -82,10 +82,10 @@ void log_loop() {
 
   Debug.printf("Loop rate %.1f [#/second]\n", lr);
 
-  Log.printf("%s {\"rfid_scans\":%u,\"rfid_misses\":%u,"\
-             "\"ota\":true,\"state\":3,\"IP_address\":\"%s\","\
-             "\"Mac_address\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
-             "\"Firmware\":\"%s\",\"heap\":%u,\"coreTemp\": %.1f,\"loopRate\":%.1f}\n",
+  Log.printf("%s {\"scans\":%u,\"miss\":%u,"\
+             "\"ota\":true,\"state\":3,\"IP\":\"%s\","\
+             "\"MAC\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
+             "\"Firmware\":\"%s\",\"heap\":%u,\"temp\": %.1f,\"loop\":%.1f}\n",
              stationname, rfid_scans, rfid_miss,
              WiFi.localIP().toString().c_str(),
              String(WiFi.macAddress()).c_str(), paid,
