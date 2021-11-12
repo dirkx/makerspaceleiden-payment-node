@@ -8,7 +8,7 @@
 extern char tag[128];
 extern unsigned int rfid_scans, rfid_miss;
 
-void setupRFID();
+bool setupRFID();
 bool loopRFID();
 
 #endif

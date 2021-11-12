@@ -15,12 +15,32 @@ MFRC522 mfrc522 = MFRC522(&spiDevice);
 char tag[128] = { 0 };
 
 unsigned int rfid_scans = 0, rfid_miss = 0;
-void setupRFID()
+bool setupRFID()
 {
   RFID_SPI.begin(RFID_SCLK, RFID_MISO, RFID_MOSI, RFID_CS);
   mfrc522.PCD_Init();
-  Log.print("RFID Scanner: ");
-  mfrc522.PCD_DumpVersionToSerial();  // Show details of PCD - MFRC522 Card Reader details
+
+  // Lookup which version - coppied from PubSub
+  //
+  byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+
+  // When 0x00 or 0xFF is returned, communication probably failed
+  if ((v == 0x00) || (v == 0xFF)) {
+    Log.println(F("RFID scanner Communication failure, is the MFRC522 properly wired up?"));
+    return false;
+  };
+
+  Log.print(F("MFRC522 (rfid reader/writer) Firmware Version: 0x"));
+  Log.print(v, HEX);
+  switch (v) {
+    case 0x88: Log.println(F(" = (clone)"));  break;
+    case 0x90: Log.println(F(" = v0.0"));     break;
+    case 0x91: Log.println(F(" = v1.0"));     break;
+    case 0x92: Log.println(F(" = v2.0"));     break;
+    case 0x12: Log.println(F(" = counterfeit chip"));     break;
+    default:   Log.println(F(" = (unknown - may be wired wrong/broken)"));
+  }
+  return true;
 }
 
 bool loopRFID() {

@@ -220,7 +220,7 @@ static void setupWiFiConnectionOrReboot() {
     updateDisplay_progressBar((float)millis() / WIFI_MAX_WAIT);
     delay(HTTP_CODE_OK);
   };
-  displayForceShowErrorModal((char *)"reboot","WiFi problem");
+  displayForceShowErrorModal((char *)"reboot", "WiFi problem");
   delay(2500);
   ESP.restart();
 }
@@ -281,7 +281,12 @@ void setup()
   md = BOOT;
   updateDisplay(BOOT);
 
-  setupRFID();
+  if (!setupRFID()) {
+    displayForceShowErrorModal("RFID", "Scanner not found");
+    delay(5000);
+    ESP.restart();
+  };
+
   settupButtons();
   isPaired = setupAuth(terminalName);
 
@@ -393,22 +398,22 @@ void loop()
       // time out handled by generic timeout.
       break;
     case DID_CANCEL:
-      displayForceShowErrorModal("abort","payment cancelled");
+      displayForceShowErrorModal("abort", "payment cancelled");
       md = ENTER_AMOUNT;
       memset(tag, 0, sizeof(tag));
       break;
     case DID_OK:
       {
         char buff[48], who[PBR_LEN];
-        displayForceShow("paying","...");
-        
+        displayForceShow("paying", "...");
+
         int rc = payByREST(tag, prices[amount], descs[amount], who);
         if (rc != HTTP_CODE_OK) {
           snprintf(buff, sizeof(buff), "no payment - %03d", rc);
           displayForceShowErrorModal("FAIL", buff);
           md = ENTER_AMOUNT;
         } else {
-          displayForceShowModal("PAID",who);
+          displayForceShowModal("PAID", who);
           extra_show_delay = 1500;
           md = ENTER_AMOUNT;
           Log.printf("Paid %.2f\n", atof(prices[amount]));
@@ -431,11 +436,11 @@ void loop()
   //
   if ((millis() - lastchange > 10 * 1000 && md > ENTER_AMOUNT )) {
     if (md == OK_OR_CANCEL) {
-      displayForceShowModal("canceling",NULL);
+      displayForceShowModal("canceling", NULL);
       md = ENTER_AMOUNT;
     }
     else {
-      displayForceShowErrorModal("Timeout",NULL);
+      displayForceShowErrorModal("Timeout", NULL);
     };
     update = true;
   };
