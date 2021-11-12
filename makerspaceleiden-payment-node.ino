@@ -281,12 +281,6 @@ void setup()
   md = BOOT;
   updateDisplay(BOOT);
 
-  if (!setupRFID()) {
-    displayForceShowErrorModal("RFID", "Scanner not found");
-    delay(5000);
-    ESP.restart();
-  };
-
   settupButtons();
   isPaired = setupAuth(terminalName);
 
@@ -297,6 +291,17 @@ void setup()
   setupWiFiConnectionOrReboot();
   setupLog();
   setupOTA();
+
+  // Do this late - so that this information also is visible
+  // in (remote) logging.
+  //
+  if (!setupRFID()) {
+    displayForceShowErrorModal("RFID", "Scanner not found");
+    log_loop();
+    yield();
+    delay(5000);
+    ESP.restart();
+  };
 
   // try to get some reliable time; to stop my cert
   // checking code complaining.
@@ -313,8 +318,9 @@ void setup()
   Log.println(WiFi.macAddress());
   Log.print(  "IP:       ");
   Log.println(WiFi.localIP());
+  Log.printf("Paired:    ", isPaired ? "yes" : "no");
   Log.printf("Heap:     %d Kb\n",   (512 + heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) / 1024UL);
-
+  Serial.println();
   Log.println("Starting loop");
   md = WAITING_FOR_NTP;
 }
