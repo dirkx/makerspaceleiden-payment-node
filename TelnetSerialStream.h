@@ -9,7 +9,7 @@
 #include "log.h"
 
 #ifndef MAX_SERIAL_TELNET_CLIENTS
-#define MAX_SERIAL_TELNET_CLIENTS 3
+#define MAX_SERIAL_TELNET_CLIENTS 8
 #endif
 
 class TelnetSerialStream : public TLog {
@@ -26,6 +26,6 @@ class TelnetSerialStream : public TLog {
   private:
     uint16_t _telnetPort;
     WiFiServer * _server = NULL;
-    WiFiClient _serverClients[MAX_SERIAL_TELNET_CLIENTS];
+    WiFiClient * _serverClients[MAX_SERIAL_TELNET_CLIENTS];
   protected:
 };

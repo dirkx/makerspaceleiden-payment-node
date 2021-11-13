@@ -82,15 +82,19 @@ void log_loop() {
 
   Debug.printf("Loop rate %.1f [#/second]\n", lr);
 
-  Log.printf("%s {\"scans\":%u,\"miss\":%u,"\
+  Log.printf("%s {\"rfid_scans\":%u,\"rfid_miss\":%u,"\
              "\"ota\":true,\"state\":3,\"IP\":\"%s\","\
-             "\"MAC\":\"%s\",\"Paid\":%.2f,\"Version\":\"%s\"," \
-             "\"Firmware\":\"%s\",\"heap\":%u,\"temp\": %.1f,\"loop\":%.1f}\n",
+             "\"MAC\":\"%s\",\"paid\":%.2f,\"version\":\"%s\"," \
+             "\"firmware\":\"%s\",\"heap\":%u,\"coreTemp\": %.1f,"
+             "\"loopRate\":%.1f,"
+             "\"stationName\":%s,"
+             "\"}\n",
              stationname, rfid_scans, rfid_miss,
              WiFi.localIP().toString().c_str(),
              String(WiFi.macAddress()).c_str(), paid,
              VERSION, terminalName,
-             heap_caps_get_free_size(MALLOC_CAP_INTERNAL), coreTemp(), lr);
+             heap_caps_get_free_size(MALLOC_CAP_INTERNAL), 
+             coreTemp(), lr, stationname);
 
   cntr = 0;
   last_report = millis();
