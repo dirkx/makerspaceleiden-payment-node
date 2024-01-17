@@ -23,7 +23,6 @@
 //    Button2
 //    MFRC522-spi-i2c-uart-async
 //    Arduino_JSON
-//    ESP32_AnalogWrite
 
 char terminalName[64];
 
@@ -34,7 +33,6 @@ char terminalName[64];
 #include "esp_heap_caps.h"
 
 #include <Button2.h>
-#include <analogWrite.h>
 
 #include "TelnetSerialStream.h"
 #include "global.h"
@@ -170,6 +168,10 @@ void setupLEDS()
   digitalWrite(LED_1, (BOARD == BOARD_V2) ? HIGH : LOW);
   digitalWrite(LED_2, (BOARD == BOARD_V2) ? HIGH : LOW);
   delay(50);
+  ledcSetup(1, 2500, 8);
+  ledcAttachPin(LED_1, 1);  
+  ledcSetup(2, 2500, 8);
+  ledcAttachPin(LED_1, 2);  
   led_loop(md);
 }
 #else
@@ -183,11 +185,11 @@ void led_loop(state_t md) {
 #ifdef ENDLESS
       // Visibly dim the buttons at the end of the strip; as current 'wrap around'
       // is not endless.
-      analogWrite(LED_1, normal_led_brightness);
-      analogWrite(LED_2, normal_led_brightness);
+      ledcWrite(1, normal_led_brightness);
+      ledcWrite(2, normal_led_brightness);
 #else
-      analogWrite(LED_1, amount + 1 == NA ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
-      analogWrite(LED_2, amount == 0 ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
+      ledcWrite(1, amount + 1 == NA ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
+      ledcWrite(2, amount == 0 ? normal_led_brightness : (BOARD == BOARD_V2) ? HIGH : LOW);
 #endif
       break;
     case OK_OR_CANCEL:

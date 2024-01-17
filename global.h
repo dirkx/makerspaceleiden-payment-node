@@ -17,6 +17,9 @@
  *                 board, logging (telnet, syslog, mqtt), falish
  *                 reporting much like the ACL nodes. Support V3
  *                 boards.
+ * 1.05 2024/01/17 Remove dependency on EPS32_analogWrite polyfill - as it
+ *                 is no longer compatible with HAL & a native method has
+ *                 been added since.
  */
 
 #ifndef TERMINAL_NAME
